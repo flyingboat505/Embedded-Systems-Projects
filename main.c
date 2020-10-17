@@ -4,8 +4,10 @@
 #include "adc.h"
 #include "board_io.h"
 
+#include "acceleration.h"
 #include "common_macros.h"
 #include "delay.h"
+#include "ff.h"
 #include "gpio.h"
 #include "gpio_isr.h"
 #include "gpio_lab.h"
@@ -18,8 +20,6 @@
 #include "sj2_cli.h"
 #include "task.h"
 #include "uart_lab.h"
-#include "acceleration.h"
-#include "ff.h"
 #include <string.h>
 
 static void create_blinky_tasks(void);
@@ -31,139 +31,69 @@ static QueueHandle_t sensor_queue;
 
 typedef enum { switch__off, switch__on } switch_e;
 
-
 // testing git
 
 void write_file_using_fatfs_pi(acceleration__axis_data_s value) {
-    const char* filename = "sensor.txt";
-    FIL file; // File handle
-    UINT bytes_written = 0;
-    FRESULT result = f_open(&file, filename, (FA_WRITE | FA_CREATE_ALWAYS));
+  const char *filename = "sensor.txt";
+  FIL file; // File handle
+  UINT bytes_written = 0;
+  FRESULT result = f_open(&file, filename, (FA_WRITE | FA_CREATE_ALWAYS));
 
-    if (FR_OK == result) {
-        char string[64];
-        sprintf(string, "x=%i y=%i z=%i \n", value.x, value.y, value.z);
-        if (FR_OK == f_write(&file, string, strlen(string), &bytes_written)) {
-        }
-        else {
-            printf("ERROR: Failed to write data to file\n");
-        }
-        f_close(&file);
+  if (FR_OK == result) {
+    char string[64];
+    sprintf(string, "x=%i y=%i z=%i \n", value.x, value.y, value.z);
+    if (FR_OK == f_write(&file, string, strlen(string), &bytes_written)) {
+    } else {
+      printf("ERROR: Failed to write data to file\n");
     }
-    else {
-        printf("ERROR: Failed to open: %s\n", filename);
-    }
+    f_close(&file);
+  } else {
+    printf("ERROR: Failed to open: %s\n", filename);
+  }
 }
 
 // TODO: Create this task at PRIORITY_LOW
 void producer(void *p) {
-    acceleration__axis_data_s value = 0;
-    int count = 1, x_total = 0, y_total = 0, z_total = 0;
-  while (count<100) {
-      value = acceleration__get_data();
-      x_total += value.x;
-      y_total += value.y;
-      z_total += value.z;
-      count++;
+  acceleration__axis_data_s value;
+  int count = 0, x_total = 0, y_total = 0, z_total = 0;
+  while (count < 100) {
+    value = acceleration__get_data();
+    x_total += value.x;
+    y_total += value.y;
+    z_total += value.z;
+    count++;
   }
 
-  value.x = x_total/100;
-  value.y = y_total/100;
-  value.z = z_total/100;
-  if (xQueueSend(sensor_queue, value, portMAX_DELAY) //double check
-      printf("Sent Values x=%i y=%i z=%i \n", value.x, value.y, value.z);
+  value.x = x_total / 100;
+  value.y = y_total / 100;
+  value.z = z_total / 100;
+  if (xQueueSend(sensor_queue, &value, portMAX_DELAY)) // double check
+    fprintf(stderr, "Sent Values x=%i y=%i z=%i \n", value.x, value.y, value.z);
   else
-      printf("Failed to send value  \n");
-
+    fprintf(stderr, "Failed to send value  \n");
 }
 
 // TODO: Create this task at PRIORITY_HIGH
 void consumer(void *p) {
   acceleration__axis_data_s value;
   while (1) {
-    printf("Attempting to recieve value \n");
+    fprintf(stderr, "Attempting to recieve value \n");
     if (xQueueReceive(sensor_queue, &value, portMAX_DELAY)) {
-        printf("Received Values  x=%i y=%i z=%i \n", value.x, value.y, value.z);
-        write_file_using_fatfs_pi(value);
-    }
-    else
-      printf("Failed to Received value  \n");
-  }
-}
-
-void uart_init_pins() {
-  LPC_IOCON->P0_0 = 0b010; // U3_TXD
-  LPC_IOCON->P0_1 = 0b010; // U3_RXD
-
-  LPC_GPIO0->DIR |= (1 << 0);
-  LPC_GPIO0->DIR &= ~(1 << 1);
-}
-void uart_read_task(void *p) {
-  uart_number_e UART_TYPE = UART_3;
-  char value;
-  while (1) {
-    if (uart_lab__polled_get(UART_TYPE, &value)) {
-      printf("Reading Value %c \n", value);
-    } else {
-      printf("Read Failed \n");
-    }
-    vTaskDelay(500);
-  }
-}
-
-void uart_write_task(void *p) {
-  uart_number_e UART_TYPE = UART_3;
-  char value = 'Z';
-  while (1) {
-    if (uart_lab__polled_put(UART_TYPE, value)) {
-      printf("Writing = Value %c to UART \n", value);
-      value = (char)((value - 'A' + 1) % 26 + 'A');
-    } else {
-      printf("Write Failed \n");
-    }
-    // TODO: Use uart_lab__polled_put() function and send a value
-    vTaskDelay(500);
-  }
-}
-
-void uart_queue_task(void *p) {
-  char val;
-  while (true) {
-    if (uart_lab__get_char_from_queue(&val, 100)) {
-      printf("Received value from queue %c  \n \n ", val);
-    }
-    vTaskDelay(100);
-  }
-}
-
-QueueHandle_t q;
-
-int x, y;
-
-// producer
-void task1(void *p) {
-  while (1) {
-    xQueueSend(q, &x, 0);
-    vTaskDelay(1000);
-  }
-}
-
-// consumer
-void task2(void *p) {
-  while (1) {
-    xQueueReceive(q, &y, portMAX_DELAY);
-    printf("Received %d\n", y);
+      fprintf(stderr, "Received Values  x=%i y=%i z=%i \n", value.x, value.y, value.z);
+      // write_file_using_fatfs_pi(value);
+    } else
+      fprintf(stderr, "Failed to Received value  \n");
   }
 }
 
 int main(void) {
 
-  create_blinky_tasks();
+  // create_blinky_tasks();
   create_uart_task();
   acceleration__init();
   sensor_queue = xQueueCreate(1, sizeof(acceleration__axis_data_s));
-  xTaskCreate(task1, "producer", 1024 / sizeof(void *), NULL, 1, NULL);
-  xTaskCreate(task2, "consumer", 1024 / sizeof(void *), NULL, 1, NULL);
+  xTaskCreate(producer, "producer", 2048 / sizeof(void *), NULL, 2, NULL);
+  xTaskCreate(consumer, "consumer", 2048 / sizeof(void *), NULL, 2, NULL);
   vTaskStartScheduler();
   return 0;
 }
