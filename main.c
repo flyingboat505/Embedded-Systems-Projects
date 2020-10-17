@@ -52,37 +52,39 @@ void write_file_using_fatfs_pi(acceleration__axis_data_s value) {
   }
 }
 
-// TODO: Create this task at PRIORITY_LOW
 void producer(void *p) {
   acceleration__axis_data_s value;
-  int count = 0, x_total = 0, y_total = 0, z_total = 0;
-  while (count < 100) {
-    value = acceleration__get_data();
-    x_total += value.x;
-    y_total += value.y;
-    z_total += value.z;
-    count++;
+  while (1) {
+    int16_t count = 0, x_total = 0, y_total = 0, z_total = 0;
+    while (count < 100) {
+      value = acceleration__get_data();
+      x_total += value.x;
+      y_total += value.y;
+      z_total += value.z;
+      count++;
+      vTaskDelay(1);
+    }
+    value.x = x_total / 100;
+    value.y = y_total / 100;
+    value.z = z_total / 100;
+    if (xQueueSend(sensor_queue, &value, 0))
+      printf("Send: x=%i y=%i z=%i \n", value.x, value.y, value.z);
+    else
+      printf("Failed to send value  \n");
+    vTaskDelay(100);
   }
-
-  value.x = x_total / 100;
-  value.y = y_total / 100;
-  value.z = z_total / 100;
-  if (xQueueSend(sensor_queue, &value, portMAX_DELAY)) // double check
-    fprintf(stderr, "Sent Values x=%i y=%i z=%i \n", value.x, value.y, value.z);
-  else
-    fprintf(stderr, "Failed to send value  \n");
 }
 
 // TODO: Create this task at PRIORITY_HIGH
 void consumer(void *p) {
   acceleration__axis_data_s value;
   while (1) {
-    fprintf(stderr, "Attempting to recieve value \n");
+    printf("Attempting to recieve value \n");
     if (xQueueReceive(sensor_queue, &value, portMAX_DELAY)) {
-      fprintf(stderr, "Received Values  x=%i y=%i z=%i \n", value.x, value.y, value.z);
+      printf("Received: x=%i y=%i z=%i \n", value.x, value.y, value.z);
       // write_file_using_fatfs_pi(value);
     } else
-      fprintf(stderr, "Failed to Received value  \n");
+      printf("Failed to Received value  \n");
   }
 }
 
@@ -90,10 +92,10 @@ int main(void) {
 
   // create_blinky_tasks();
   create_uart_task();
-  acceleration__init();
+ acceleration__init();
   sensor_queue = xQueueCreate(1, sizeof(acceleration__axis_data_s));
-  xTaskCreate(producer, "producer", 2048 / sizeof(void *), NULL, 2, NULL);
-  xTaskCreate(consumer, "consumer", 2048 / sizeof(void *), NULL, 2, NULL);
+  xTaskCreate(producer, "Send", 2048/sizeof(void*), NULL, 2, NULL);
+  xTaskCreate(consumer, "Receive", 2048/sizeof(void*), NULL, 2, NULL);
   vTaskStartScheduler();
   return 0;
 }
