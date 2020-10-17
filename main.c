@@ -31,6 +31,9 @@ static QueueHandle_t sensor_queue;
 
 typedef enum { switch__off, switch__on } switch_e;
 
+
+// testing git
+
 void write_file_using_fatfs_pi(acceleration__axis_data_s value) {
     const char* filename = "sensor.txt";
     FIL file; // File handle
