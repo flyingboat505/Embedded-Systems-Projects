@@ -7,6 +7,7 @@
 #include "acceleration.h"
 #include "common_macros.h"
 #include "delay.h"
+#include "event_groups.h"
 #include "ff.h"
 #include "gpio.h"
 #include "gpio_isr.h"
@@ -16,6 +17,7 @@
 #include "periodic_scheduler.h"
 #include "pwm1.h"
 #include "queue.h"
+#include "sd_card.h"
 #include "semphr.h"
 #include "sj2_cli.h"
 #include "task.h"
@@ -33,11 +35,11 @@ typedef enum { switch__off, switch__on } switch_e;
 
 // testing git
 
-void write_file_using_fatfs_pi(const char* value) { //Changed this to a string to write messenge to file
-  const char *filename = "sensor.txt";
+void write_file_using_fatfs_pi(const char *value) { // Changed this to a string to write messenge to file
+  const char *filename = "OUTPUT_for_sensor.txt";
   FIL file; // File handle
   UINT bytes_written = 0;
-  FRESULT result = f_open(&file, filename, (FA_WRITE | FA_CREATE_ALWAYS));
+  FRESULT result = f_open(&file, filename, (FA_WRITE | FA_OPEN_APPEND));
 
   if (FR_OK == result) {
     char string[64];
@@ -104,7 +106,7 @@ void consumer(void *p) {
     if (xQueueReceive(sensor_queue, &value, portMAX_DELAY)) {
       printf("Received: x=%i y=%i z=%i \n", value.x, value.y, value.z);
       sprintf(string, "x=%i y=%i z=%i", value.x, value.y, value.z);
-      // write_file_using_fatfs_pi(string);
+      write_file_using_fatfs_pi(string);
     } else
       printf("Failed to Received value  \n");
   }
@@ -119,18 +121,27 @@ const uint32_t task_bits = (0b11);
 void producer_task_part1(void *p) {
   while (1) {
     acceleration__axis_data_s value = get_sensor_value();
-    printf("Send: x=%i y=%i z=%i \n", value.x, value.y, value.z);
-    xQueueSend(sensor_queue, &value, 0);
-    xEventGroupSetBits(watchdog_handler, producer_task_bit);
+    if (xQueueSend(sensor_queue, &value, 0)) {
+      printf("Send: x=%i y=%i z=%i \n", value.x, value.y, value.z);
+      xEventGroupSetBits(watchdog_handler, producer_task_bit);
+    } else
+      printf("Failed to send value  \n");
     vTaskDelay(100);
   }
 }
 
 void consumer_task_part1(void *p) {
   acceleration__axis_data_s value;
+  char string[64];
   while (1) {
-    xQueueReceive(sensor_queue, &value, portMAX_DELAY);
-    xEventGroupSetBits(watchdog_handler, consumer_task_bit);
+    printf("Attempting to recieve value \n");
+    if (xQueueReceive(sensor_queue, &value, portMAX_DELAY)) {
+      printf("Received: x=%i y=%i z=%i \n", value.x, value.y, value.z);
+      sprintf(string, "x=%i y=%i z=%i", value.x, value.y, value.z);
+      write_file_using_fatfs_pi(string);
+      xEventGroupSetBits(watchdog_handler, consumer_task_bit);
+    } else
+      printf("Failed to Received value  \n");
   }
 }
 
