@@ -146,6 +146,7 @@ void consumer_task_part1(void *p) {
 }
 
 void watchdog_task(void *p) {
+    char string[64]; 
   while (1) {
     // Time for tickdelay should be greater than 200ms.
     uint32_t detector = xEventGroupWaitBits(watchdog_handler, task_bits, pdTRUE, pdTRUE, 201);
@@ -153,11 +154,19 @@ void watchdog_task(void *p) {
            ((detector == 0b11) ? "11" : ((detector == 0b10) ? "10" : ((detector == 0b01) ? "01" : "00"))));
     if ((detector & task_bits) == 0b11) {
       printf("Both task are healthy\n");
+      sprintf(string, "Both task are healthy");
+      write_file_using_fatfs_pi(string);
     } else {
-      if (!(detector & producer_task_bit))
-        printf("Producer task is not responding\n");
-      if (!(detector & consumer_task_bit))
-        printf("Consumer task is not responding\n");
+        if (!(detector & producer_task_bit)) {
+            printf("Producer task is not responding\n");
+            sprintf(string, "Producer task is not responding");
+            write_file_using_fatfs_pi(string);
+        }
+        if (!(detector & consumer_task_bit)) {
+            printf("Consumer task is not responding\n");
+            sprintf(string, "Consumer task is not responding");
+            write_file_using_fatfs_pi(string);
+        }
     }
   }
 }
