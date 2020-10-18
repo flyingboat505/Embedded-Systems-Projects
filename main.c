@@ -36,7 +36,7 @@ typedef enum { switch__off, switch__on } switch_e;
 // testing git
 
 void write_file_using_fatfs_pi(const char *value) { // Changed this to a string to write messenge to file
-  const char *filename = "OUTPUT_for_sensor.txt";
+  const char *filename = "part1.txt";
   FIL file; // File handle
   UINT bytes_written = 0;
   FRESULT result = f_open(&file, filename, (FA_WRITE | FA_OPEN_APPEND));
@@ -146,7 +146,7 @@ void consumer_task_part1(void *p) {
 }
 
 void watchdog_task(void *p) {
-    char string[64]; 
+  char string[64];
   while (1) {
     // Time for tickdelay should be greater than 200ms.
     uint32_t detector = xEventGroupWaitBits(watchdog_handler, task_bits, pdTRUE, pdTRUE, 201);
@@ -157,16 +157,16 @@ void watchdog_task(void *p) {
       sprintf(string, "Both task are healthy");
       write_file_using_fatfs_pi(string);
     } else {
-        if (!(detector & producer_task_bit)) {
-            printf("Producer task is not responding\n");
-            sprintf(string, "Producer task is not responding");
-            write_file_using_fatfs_pi(string);
-        }
-        if (!(detector & consumer_task_bit)) {
-            printf("Consumer task is not responding\n");
-            sprintf(string, "Consumer task is not responding");
-            write_file_using_fatfs_pi(string);
-        }
+      if (!(detector & producer_task_bit)) {
+        printf("Producer task is not responding\n");
+        sprintf(string, "Producer task is not responding");
+        write_file_using_fatfs_pi(string);
+      }
+      if (!(detector & consumer_task_bit)) {
+        printf("Consumer task is not responding\n");
+        sprintf(string, "Consumer task is not responding");
+        write_file_using_fatfs_pi(string);
+      }
     }
   }
 }
@@ -197,7 +197,7 @@ int main(void) {
   create_uart_task();
   puts("Starting RTOS");
 
-  lab7_part0();
+  lab7_part1();
   // lab7_part1();
 
   vTaskStartScheduler(); // Ths function never returns unless RTOS scheduler runs out of memory and fails
