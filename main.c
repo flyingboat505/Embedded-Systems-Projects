@@ -33,7 +33,7 @@ typedef enum { switch__off, switch__on } switch_e;
 
 // testing git
 
-void write_file_using_fatfs_pi(acceleration__axis_data_s value) {
+void write_file_using_fatfs_pi(const char* value) { //Changed this to a string to write messenge to file
   const char *filename = "sensor.txt";
   FIL file; // File handle
   UINT bytes_written = 0;
@@ -41,7 +41,8 @@ void write_file_using_fatfs_pi(acceleration__axis_data_s value) {
 
   if (FR_OK == result) {
     char string[64];
-    sprintf(string, "x=%i y=%i z=%i \n", value.x, value.y, value.z);
+    uint32_t time = xTaskGetTickCount();
+    sprintf(string, "%i, %s \n", time, value);
     if (FR_OK == f_write(&file, string, strlen(string), &bytes_written)) {
     } else {
       printf("ERROR: Failed to write data to file\n");
@@ -52,21 +53,40 @@ void write_file_using_fatfs_pi(acceleration__axis_data_s value) {
   }
 }
 
+/*==========================================================
+ *        S E N S O R   F U N C T I O N S
+ *==========================================================
+ */
+acceleration__axis_data_s get_sensor_value(void) {
+  acceleration__axis_data_s value;
+  int16_t count = 0, x_total = 0, y_total = 0, z_total = 0;
+  while (count < 100) {
+    value = acceleration__get_data();
+    x_total += value.x;
+    y_total += value.y;
+    z_total += value.z;
+    count++;
+    // delay__ms(1);
+    vTaskDelay(1);
+  }
+  value.x = x_total / 100;
+  value.y = y_total / 100;
+  value.z = z_total / 100;
+  return value;
+}
+
+/*==========================================================
+ *              T A S K    F U N C T I O N S
+ *==========================================================
+ */
+
+//=========================PART 0============================
+static QueueHandle_t sensor_queue;
+
 void producer(void *p) {
   acceleration__axis_data_s value;
   while (1) {
-    int16_t count = 0, x_total = 0, y_total = 0, z_total = 0;
-    while (count < 100) {
-      value = acceleration__get_data();
-      x_total += value.x;
-      y_total += value.y;
-      z_total += value.z;
-      count++;
-      vTaskDelay(1);
-    }
-    value.x = x_total / 100;
-    value.y = y_total / 100;
-    value.z = z_total / 100;
+    value = get_sensor_value();
     if (xQueueSend(sensor_queue, &value, 0))
       printf("Send: x=%i y=%i z=%i \n", value.x, value.y, value.z);
     else
@@ -77,26 +97,90 @@ void producer(void *p) {
 
 // TODO: Create this task at PRIORITY_HIGH
 void consumer(void *p) {
+  char string[64];
   acceleration__axis_data_s value;
   while (1) {
     printf("Attempting to recieve value \n");
     if (xQueueReceive(sensor_queue, &value, portMAX_DELAY)) {
       printf("Received: x=%i y=%i z=%i \n", value.x, value.y, value.z);
-      // write_file_using_fatfs_pi(value);
+      sprintf(string, "x=%i y=%i z=%i", value.x, value.y, value.z);
+      // write_file_using_fatfs_pi(string);
     } else
       printf("Failed to Received value  \n");
   }
 }
 
-int main(void) {
+//=========================PART 1============================
+static EventGroupHandle_t watchdog_handler;
+const uint32_t producer_task_bit = (1 << 0);
+const uint32_t consumer_task_bit = (1 << 1);
+const uint32_t task_bits = (0b11);
 
-  // create_blinky_tasks();
-  create_uart_task();
- acceleration__init();
+void producer_task_part1(void *p) {
+  while (1) {
+    acceleration__axis_data_s value = get_sensor_value();
+    printf("Send: x=%i y=%i z=%i \n", value.x, value.y, value.z);
+    xQueueSend(sensor_queue, &value, 0);
+    xEventGroupSetBits(watchdog_handler, producer_task_bit);
+    vTaskDelay(100);
+  }
+}
+
+void consumer_task_part1(void *p) {
+  acceleration__axis_data_s value;
+  while (1) {
+    xQueueReceive(sensor_queue, &value, portMAX_DELAY);
+    xEventGroupSetBits(watchdog_handler, consumer_task_bit);
+  }
+}
+
+void watchdog_task(void *p) {
+  while (1) {
+    // Time for tickdelay should be greater than 200ms.
+    uint32_t detector = xEventGroupWaitBits(watchdog_handler, task_bits, pdTRUE, pdTRUE, 201);
+    printf("Result: b'%s\n",
+           ((detector == 0b11) ? "11" : ((detector == 0b10) ? "10" : ((detector == 0b01) ? "01" : "00"))));
+    if ((detector & task_bits) == 0b11) {
+      printf("Both task are healthy\n");
+    } else {
+      if (!(detector & producer_task_bit))
+        printf("Producer task is not responding\n");
+      if (!(detector & consumer_task_bit))
+        printf("Consumer task is not responding\n");
+    }
+  }
+}
+/*==========================================================
+ *         R E G U L A R   F U N C T I O N S
+ *==========================================================
+ */
+//
+static void lab7_part0() {
+  acceleration__init();
   sensor_queue = xQueueCreate(1, sizeof(acceleration__axis_data_s));
-  xTaskCreate(producer, "Send", 2048/sizeof(void*), NULL, 2, NULL);
-  xTaskCreate(consumer, "Receive", 2048/sizeof(void*), NULL, 2, NULL);
-  vTaskStartScheduler();
+  xTaskCreate(producer, "Send", 1024, NULL, 2, NULL);
+  xTaskCreate(consumer, "Receive", 1024, NULL, 2, NULL);
+}
+
+static void lab7_part1() {
+  acceleration__init();
+  watchdog_handler = xEventGroupCreate();
+  sensor_queue = xQueueCreate(1, sizeof(acceleration__axis_data_s));
+  xTaskCreate(producer_task_part1, "Producer", 1024, NULL, 2, NULL);
+  xTaskCreate(consumer_task_part1, "Consumer", 1024, NULL, 2, NULL);
+  xTaskCreate(watchdog_task, "WatchDog_task", 1024, NULL, 3, NULL);
+}
+//==========================================================
+
+int main(void) {
+  create_blinky_tasks();
+  create_uart_task();
+  puts("Starting RTOS");
+
+  lab7_part0();
+  // lab7_part1();
+
+  vTaskStartScheduler(); // Ths function never returns unless RTOS scheduler runs out of memory and fails
   return 0;
 }
 
