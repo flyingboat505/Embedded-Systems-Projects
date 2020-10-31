@@ -1,0 +1,296 @@
+#include <stdio.h>
+
+#include "FreeRTOS.h"
+#include "board_io.h"
+#include "common_macros.h"
+#include "delay.h"
+#include "gpio.h"
+#include "gpio_isr.h"
+#include "gpio_lab.h"
+#include "lpc40xx.h"
+#include "lpc_peripherals.h"
+#include "periodic_scheduler.h"
+#include "pwm1.h"
+#include "semphr.h"
+#include "sj2_cli.h"
+#include "task.h"
+
+// static void task_one(void *task_parameter);
+// static void task_two(void *task_parameter); // add for lab 2
+void lab3_part2_led_task(void *task_parameter);
+void lab3_part0_led_task(void *pvParameters);
+void lab4_interupts_Part0();
+void lab4_part1_gpio_interrupt();
+void sleep_on_sem_task(void *p);
+void configure_gpio_interrupt();
+void lab3_part3_led_task(void *task_parameter);
+void lab3_part3_switch_task(void *task_parameter);
+
+static void create_blinky_tasks(void);
+static void create_uart_task(void);
+static void blink_task(void *params);
+static void uart_task(void *params);
+
+static SemaphoreHandle_t switch_press_indication;
+SemaphoreHandle_t switch_pressed_signal;
+// 0) Set the IOCON MUX function select pins to 000 figure this out- works without-
+// 32_t
+/*typedef struct {
+  /* First get gpio0 driver to work only, and if you finish it
+   * you can do the extra credit to also make it work for other Ports
+ 
+  // uint8_t port;
+
+  uint8_t pin;
+} port_pin_s;*/
+
+/*void lab4_part0_gpio_interrupt() {
+  LPC_GPIOINT->IO0IntClr = (1 << 29);
+  fprintf(stderr, "Part 0 interrupt toggled \n");
+}*/
+
+// void pin29_isr(void) { fprintf(stderr, "Part 2 Pin 29 Subinterrupt toggled \n"); }
+// void pin30_isr(void) { fprintf(stderr, "Part 2 Pin 30 Subinterrupt toggled \n"); }
+
+// void custom_isr() { gpio0__interrupt_dispatcher(); }
+
+/*
+gpio_s gpio__construct_with_function(gpio__port_e port, uint8_t pin_number_0_to_31, gpio__function_e function) {
+  gpio_s gpio = gpio__construct(port, pin_number_0_to_31);
+  gpio__set_function(gpio, function);
+  return gpio;
+}*/
+pin_configure_pwm_channel_as_io_pin() {
+  // port 2.5 PWM1[6] 001
+  // clear first 3 bits
+  LPC_IOCON->P2_5 &= ~(7); // clearing first 3 bits
+  LPC_IOCON->P2_5 |= (1);  // setting first bit
+}
+
+void lab5_part_0_pwm_task(void *p) {
+  pwm1__init_single_edge(1000);
+
+  // Locate a GPIO pin that a PWM channel will control
+  // NOTE You can use gpio__construct_with_function() API from gpio.h
+  // TODO Write this function yourself
+  // choosing PIN 1.1
+  pin_configure_pwm_channel_as_io_pin();
+
+  // We only need to set PWM configuration once, and the HW will drive
+  // the GPIO at 1000Hz, and control set its duty cycle to 50%
+  pwm1__set_duty_cycle(PWM1__2_0, 50);
+
+  // Continue to vary the duty cycle in the loop
+  uint8_t percent = 0;
+  while (1) {
+    pwm1__set_duty_cycle(PWM1__2_0, percent);
+    // percent starts at 1-Ask Preet
+    if (++percent > 100) {
+      percent = 0;
+    }
+
+    vTaskDelay(100);
+  }
+}
+
+int main(void) {
+  create_blinky_tasks();
+  create_uart_task();
+
+  puts("Starting RTOS");
+
+  xTaskCreate(adc_task, "Part0Task", 1024, NULL, 1, NULL);
+
+  vTaskStartScheduler();
+  return 0;
+}
+
+void lab4_part1_gpio_interrupt() {
+  LPC_GPIOINT->IO0IntClr = (1 << 29);
+  // ASK why is it recognized as switch_pressed_signal?
+  xSemaphoreGiveFromISR(switch_pressed_signal, NULL);
+  LPC_GPIOINT->IO0IntClr = (1 << 29);
+}
+
+void sleep_on_sem_task(void *p) {
+  while (1) {
+    const uint32_t led3 = (1U << 18);
+    LPC_GPIO1->DIR |= led3;
+    if (xSemaphoreTake(switch_pressed_signal, portMAX_DELAY)) {
+      vTaskDelay(100);
+      LPC_GPIO1->PIN |= led3;
+      vTaskDelay(100);
+      LPC_GPIO1->PIN &= ~led3;
+      fprintf(stderr, "Part 1 Interrupt \n");
+    }
+
+    // Use xSemaphoreTake with forever delay and blink an LED when you get the signal
+  }
+}
+
+void configure_gpio_interrupt() {
+  LPC_GPIO0->DIR &= ~(1 << 29);
+  LPC_GPIOINT->IO0IntEnF |= (1 << 29);
+  lpc_peripheral__enable_interrupt(LPC_PERIPHERAL__GPIO, lab4_part1_gpio_interrupt, "Part1Interrupt");
+  NVIC_EnableIRQ(GPIO_IRQn);
+}
+
+void lab4_interupts_Part0() {
+  // Make P0.29 an Input
+  LPC_GPIO0->DIR &= ~(1 << 29);
+  // NEED TO Configure the registers to trigger Port0 interrupt (such as falling edge)
+  // ENF0 R/W 0x094 GPIO Interrupt Enable for Falling edge for Port 0.
+  LPC_GPIOINT->IO0IntEnF |= (1 << 29);
+  lpc_peripheral__enable_interrupt(LPC_PERIPHERAL__GPIO, lab4_part0_gpio_interrupt, "Part0Interrupt");
+  NVIC_EnableIRQ(GPIO_IRQn);
+
+  const uint32_t led3 = (1U << 18);
+  LPC_GPIO1->DIR |= led3;
+  while (1) {
+    delay__ms(100);
+    LPC_GPIO1->PIN |= led3;
+    delay__ms(100);
+    LPC_GPIO1->PIN &= ~led3;
+  }
+}
+
+void lab3_part0_led_task(void *pvParameters) {
+  // last 3 bits are all 0 from 1's complement
+  LPC_IOCON->P1_18 = ~(0b111);
+  // P1_18 = ~(1<<0);
+  // P1_18 = ~(1 << 1);
+  // P1_18 = ~(1 << 2);
+  // P1_18 = ~(7 << 0);
+
+  // looking at PORT 1 DIR register->18
+  const uint32_t led3 = (1U << 18);
+  LPC_GPIO1->DIR |= led3;
+
+  while (true) {
+    LPC_GPIO1->PIN |= led3;
+    vTaskDelay(500);
+    LPC_GPIO1->PIN &= ~led3;
+    vTaskDelay(500);
+  }
+}
+
+void lab3_part2_led_task(void *task_parameter) {
+  // Type-cast the paramter that was passed from xTaskCreate()
+  const port_pin_s *led = (port_pin_s *)(task_parameter);
+  while (true) {
+    gpio1__set_high(led->pin);
+    vTaskDelay(100);
+
+    gpio1__set_low(led->pin);
+    vTaskDelay(100);
+  }
+}
+
+void lab3_part3_led_task(void *task_parameter) {
+  port_pin_s *led = (port_pin_s *)task_parameter;
+  gpio1__set_as_output(led->pin);
+  while (true) {
+    // Note: There is no vTaskDelay() here, but we use sleep mechanism while waiting for the binary semaphore (signal)
+    if (xSemaphoreTake(switch_press_indication, 1000)) {
+      gpio1__set_high(led->pin);
+      vTaskDelay(500);
+      gpio1__set_low(led->pin);
+      vTaskDelay(500);
+    } else {
+      puts("Timeout: No switch press indication for 1000ms");
+    }
+  }
+}
+
+void lab3_part3_switch_task(void *task_parameter) {
+  port_pin_s *sw = (port_pin_s *)task_parameter;
+  /// P1_19
+  // LPC_IOCON->P0_29 = ~(0b111);
+  // const uint32_t switch3 = (1U << 29);
+  // LPC_GPIO0->DIR |= switch3;
+  while (true) {
+    // TODO: If switch pressed, set the binary semaphore
+    if (gpio1__get_level(sw->pin)) {
+      xSemaphoreGive(switch_press_indication);
+    }
+
+    // Task should always sleep otherwise they will use 100% CPU
+    // This task sleep also helps avoid spurious semaphore give during switch debeounce
+    vTaskDelay(100);
+  }
+}
+
+static void create_blinky_tasks(void) {
+  /**
+   * Use '#if (1)' if you wish to observe how two tasks can blink LEDs
+   * Use '#if (0)' if you wish to use the 'periodic_scheduler.h' that will spawn 4 periodic tasks, one for each LED
+   */
+#if (1)
+  // These variables should not go out of scope because the 'blink_task' will reference this memory
+  static gpio_s led0, led1;
+
+  led0 = board_io__get_led0();
+  led1 = board_io__get_led1();
+
+  xTaskCreate(blink_task, "led0", configMINIMAL_STACK_SIZE, (void *)&led0, PRIORITY_LOW, NULL);
+  xTaskCreate(blink_task, "led1", configMINIMAL_STACK_SIZE, (void *)&led1, PRIORITY_LOW, NULL);
+#else
+  const bool run_1000hz = true;
+  const size_t stack_size_bytes = 2048 / sizeof(void *); // RTOS stack size is in terms of 32-bits for ARM M4 32-bit CPU
+  periodic_scheduler__initialize(stack_size_bytes, !run_1000hz); // Assuming we do not need the high rate 1000Hz task
+  UNUSED(blink_task);
+#endif
+}
+
+static void create_uart_task(void) {
+  // It is advised to either run the uart_task, or the SJ2 command-line (CLI), but not both
+  // Change '#if (0)' to '#if (1)' and vice versa to try it out
+#if (0)
+  // printf() takes more stack space, size this tasks' stack higher
+  xTaskCreate(uart_task, "uart", (512U * 8) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+#else
+  sj2_cli__init();
+  UNUSED(uart_task); // uart_task is un-used in if we are doing cli init()
+#endif
+}
+
+static void blink_task(void *params) {
+  const gpio_s led = *((gpio_s *)params); // Parameter was input while calling xTaskCreate()
+
+  // Warning: This task starts with very minimal stack, so do not use printf() API here to avoid stack overflow
+  while (true) {
+    gpio__toggle(led);
+    vTaskDelay(500);
+  }
+}
+
+// This sends periodic messages over printf() which uses system_calls.c to send them to UART0
+static void uart_task(void *params) {
+  TickType_t previous_tick = 0;
+  TickType_t ticks = 0;
+
+  while (true) {
+    // This loop will repeat at precise task delay, even if the logic below takes variable amount of ticks
+    vTaskDelayUntil(&previous_tick, 2000);
+
+    /* Calls to fprintf(stderr, ...) uses polled UART driver, so this entire output will be fully
+     * sent out before this function returns. See system_calls.c for actual implementation.
+     *
+     * Use this style print for:
+     *  - Interrupts because you cannot use printf() inside an ISR
+     *    This is because regular printf() leads down to xQueueSend() that might block
+     *    but you cannot block inside an ISR hence the system might crash
+     *  - During debugging in case system crashes before all output of printf() is sent
+     */
+    ticks = xTaskGetTickCount();
+    fprintf(stderr, "%u: This is a polled version of printf used for debugging ... finished in", (unsigned)ticks);
+    fprintf(stderr, " %lu ticks\n", (xTaskGetTickCount() - ticks));
+
+    /* This deposits data to an outgoing queue and doesn't block the CPU
+     * Data will be sent later, but this function would return earlier
+     */
+    ticks = xTaskGetTickCount();
+    printf("This is a more efficient printf ... finished in");
+    printf(" %lu ticks\n\n", (xTaskGetTickCount() - ticks));
+  }
+}

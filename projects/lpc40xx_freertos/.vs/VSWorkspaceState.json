@@ -1,0 +1,13 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\l0_lowlevel",
+    "\\l0_lowlevel\\startup",
+    "\\l3_drivers",
+    "\\l3_drivers\\sources",
+    "\\l4_io",
+    "\\l4_io\\fatfs",
+    "\\l5_application"
+  ],
+  "PreviewInSolutionExplorer": false
+}
