@@ -7,6 +7,7 @@
 #include "acceleration.h"
 #include "common_macros.h"
 #include "delay.h"
+#include "event_groups.h"
 #include "ff.h"
 #include "gpio.h"
 #include "gpio_isr.h"
@@ -16,6 +17,7 @@
 #include "periodic_scheduler.h"
 #include "pwm1.h"
 #include "queue.h"
+#include "sd_card.h"
 #include "semphr.h"
 #include "sj2_cli.h"
 #include "task.h"
@@ -28,136 +30,111 @@ static void blink_task(void *params);
 static void uart_task(void *params);
 
 static QueueHandle_t sensor_queue;
+static QueueHandle_t song_name_queue;
+static QueueHandle_t song_data_queue;
 
 typedef enum { switch__off, switch__on } switch_e;
+typedef char songname_t[64]; 
+typedef char songdata_t[512];
 
-void write_file_using_fatfs_pi(acceleration__axis_data_s value) {
-  const char *filename = "sensor.txt";
-  FIL file; // File handle
-  UINT bytes_written = 0;
-  FRESULT result = f_open(&file, filename, (FA_WRITE | FA_CREATE_ALWAYS));
+//make into cli
+static void cli_sim_task(void *p)
+{
+  songname_t songname = {0};
+  strncpy(songname, "README.md", sizeof(songname-1));
 
-  if (FR_OK == result) {
-    char string[64];
-    sprintf(string, "x=%i y=%i z=%i \n", value.x, value.y, value.z);
-    if (FR_OK == f_write(&file, string, strlen(string), &bytes_written)) {
-    } else {
-      printf("ERROR: Failed to write data to file\n");
-    }
-    f_close(&file);
-  } else {
-    printf("ERROR: Failed to open: %s\n", filename);
+  if(xQueueSend(song_name_queue, &songname, 100))
+  {
+    puts("SUCESS: SONGNAME WAS SENT TO THE QUEUE");
   }
-}
-
-// TODO: Create this task at PRIORITY_LOW
-void producer(void *p) {
-  acceleration__axis_data_s value = 0;
-  int count = 1, x_total = 0, y_total = 0, z_total = 0;
-  while (count < 100) {
-    value = acceleration__get_data();
-    x_total += value.x;
-    y_total += value.y;
-    z_total += value.z;
-    count++;
-  }
-
-  value.x = x_total / 100;
-  value.y = y_total / 100;
-  value.z = z_total / 100;
-  if (xQueueSend(sensor_queue, value, portMAX_DELAY) //double check
-      printf("Sent Values x=%i y=%i z=%i \n", value.x, value.y, value.z);
   else
-      printf("Failed to send value  \n");
-}
+  {
+    puts("FAILED: SONGNAME WAS NOT SENT TO THE QUEUE");
+  }
+  
+  vTaskDelay(NULL);
 
-// TODO: Create this task at PRIORITY_HIGH
-void consumer(void *p) {
-  acceleration__axis_data_s value;
-  while (1) {
-    printf("Attempting to recieve value \n");
-    if (xQueueReceive(sensor_queue, &value, portMAX_DELAY)) {
-      printf("Received Values  x=%i y=%i z=%i \n", value.x, value.y, value.z);
-      write_file_using_fatfs_pi(value);
-    } else
-      printf("Failed to Received value  \n");
+  while(1)
+  {
+
   }
 }
 
-void uart_init_pins() {
-  LPC_IOCON->P0_0 = 0b010; // U3_TXD
-  LPC_IOCON->P0_1 = 0b010; // U3_RXD
+static void read_file(const char *filename) {
+  printf("Request received to play/read: '%s'\n", filename);
 
-  LPC_GPIO0->DIR |= (1 << 0);
-  LPC_GPIO0->DIR &= ~(1 << 1);
+  FILE *file = f_open(filename, "rb");
+  if (NULL == file) {
+    puts("ERROR: Failed to open file");
+  } else {
+    songdata_t buffer = {0}; // zero initialize
+    int bytes_read = 0;
+    while ((bytes_read = f_read(buffer, 1, sizeof(buffer), file)) > 0) {
+      printf("Read a block of %d bytes from file\n", bytes_read);
+
+      // printf("Pointers are %p %p %p\n", buffer, &buffer[0], &buffer);
+      xQueueSend(song_data_queue, buffer, portMAX_DELAY);
+      // MAYBE WRONG: xQueueSend(mp3_song_data_queue, &buffer, portMAX_DELAY);
+      // Alternative: xQueueSend(mp3_song_data_queue, &buffer[0], portMAX_DELAY);
+
+      memset(&buffer[0], 0, sizeof(buffer));
+    }
+    f_close(file);
+  }
 }
-void uart_read_task(void *p) {
-  uart_number_e UART_TYPE = UART_3;
-  char value;
+
+static void mp3_file_reader_task(void *p) {
+  songname_t songname = {0};
+
   while (1) {
-    if (uart_lab__polled_get(UART_TYPE, &value)) {
-      printf("Reading Value %c \n", value);
+    if (xQueueReceive(song_name_queue, songname, 3000)) {
+      read_file(songname);
     } else {
-      printf("Read Failed \n");
+      puts("WARNING: No new request to read a file");
     }
-    vTaskDelay(500);
   }
 }
 
-void uart_write_task(void *p) {
-  uart_number_e UART_TYPE = UART_3;
-  char value = 'Z';
+static void mp3_decoder_send_block(songdata_t data) {
+  for (size_t index = 0; index < sizeof(songdata_t); index++) {
+    /* Real code for your SJ2
+     * if (mp3_decoder_gpio_is_high) {
+     *   spi_exchange(data[index]);
+     * } else {
+     *   vTaskDelay(1);
+     * }
+     */
+    vTaskDelay(1);
+    putchar(data[index]);
+  }
+}
+
+static void mp3_data_player_task(void *p) {
+  songdata_t songdata;
+
   while (1) {
-    if (uart_lab__polled_put(UART_TYPE, value)) {
-      printf("Writing = Value %c to UART \n", value);
-      value = (char)((value - 'A' + 1) % 26 + 'A');
-    } else {
-      printf("Write Failed \n");
+    memset(&songdata[0], 0, sizeof(songdata_t));
+    if (xQueueReceive(song_data_queue, &songdata[0], portMAX_DELAY)) {
+      mp3_decoder_send_block(songdata);
+
+    
     }
-    // TODO: Use uart_lab__polled_put() function and send a value
-    vTaskDelay(500);
   }
 }
 
-void uart_queue_task(void *p) {
-  char val;
-  while (true) {
-    if (uart_lab__get_char_from_queue(&val, 100)) {
-      printf("Received value from queue %c  \n \n ", val);
-    }
-    vTaskDelay(100);
-  }
-}
-
-QueueHandle_t q;
-
-int x, y;
-
-// producer
-void task1(void *p) {
-  while (1) {
-    xQueueSend(q, &x, 0);
-    vTaskDelay(1000);
-  }
-}
-
-// consumer
-void task2(void *p) {
-  while (1) {
-    xQueueReceive(q, &y, portMAX_DELAY);
-    printf("Received %d\n", y);
-  }
-}
+//==========================================================
 
 int main(void) {
-
   create_blinky_tasks();
   create_uart_task();
-  acceleration__init();
-  sensor_queue = xQueueCreate(1, sizeof(acceleration__axis_data_s));
-  xTaskCreate(task1, "producer", 1024 / sizeof(void *), NULL, 1, NULL);
-  xTaskCreate(task2, "consumer", 1024 / sizeof(void *), NULL, 1, NULL);
-  vTaskStartScheduler();
+  song_name_queue = xQueueCreate(1, sizeof(songname_t));
+  song_data_queue = xQueueCreate(2, sizeof(songdata_t));
+  puts("Starting RTOS");
+  xTaskCreate(cli_sim_task, "cli", 1, NULL, PRIORITY_MEDIUM, NULL);
+  xTaskCreate(mp3_file_reader_task, "reader", 1, NULL, PRIORITY_MEDIUM, NULL);
+  xTaskCreate(mp3_data_player_task, "player", 1, NULL, PRIORITY_HIGH, NULL);
+ 
+  vTaskStartScheduler(); // Ths function never returns unless RTOS scheduler runs out of memory and fails
   return 0;
 }
 
