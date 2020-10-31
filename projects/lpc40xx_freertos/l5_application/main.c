@@ -24,6 +24,7 @@
 #include "uart_lab.h"
 #include <string.h>
 
+// testing
 static void create_blinky_tasks(void);
 static void create_uart_task(void);
 static void blink_task(void *params);
@@ -34,29 +35,23 @@ static QueueHandle_t song_name_queue;
 static QueueHandle_t song_data_queue;
 
 typedef enum { switch__off, switch__on } switch_e;
-typedef char songname_t[64]; 
+typedef char songname_t[64];
 typedef char songdata_t[512];
 
-//make into cli
-static void cli_sim_task(void *p)
-{
+// make into cli
+static void cli_sim_task(void *p) {
   songname_t songname = {0};
-  strncpy(songname, "README.md", sizeof(songname-1));
+  strncpy(songname, "README.md", sizeof(songname - 1));
 
-  if(xQueueSend(song_name_queue, &songname, 100))
-  {
+  if (xQueueSend(song_name_queue, &songname, 100)) {
     puts("SUCESS: SONGNAME WAS SENT TO THE QUEUE");
-  }
-  else
-  {
+  } else {
     puts("FAILED: SONGNAME WAS NOT SENT TO THE QUEUE");
   }
-  
+
   vTaskDelay(NULL);
 
-  while(1)
-  {
-
+  while (1) {
   }
 }
 
@@ -116,8 +111,6 @@ static void mp3_data_player_task(void *p) {
     memset(&songdata[0], 0, sizeof(songdata_t));
     if (xQueueReceive(song_data_queue, &songdata[0], portMAX_DELAY)) {
       mp3_decoder_send_block(songdata);
-
-    
     }
   }
 }
@@ -133,7 +126,7 @@ int main(void) {
   xTaskCreate(cli_sim_task, "cli", 1, NULL, PRIORITY_MEDIUM, NULL);
   xTaskCreate(mp3_file_reader_task, "reader", 1, NULL, PRIORITY_MEDIUM, NULL);
   xTaskCreate(mp3_data_player_task, "player", 1, NULL, PRIORITY_HIGH, NULL);
- 
+
   vTaskStartScheduler(); // Ths function never returns unless RTOS scheduler runs out of memory and fails
   return 0;
 }
