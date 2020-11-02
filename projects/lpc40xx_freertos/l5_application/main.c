@@ -34,22 +34,24 @@ static QueueHandle_t sensor_queue;
 static QueueHandle_t song_name_queue;
 static QueueHandle_t song_data_queue;
 
-typedef enum { switch__off, switch__on } switch_e;
-typedef char songname_t[64];
+// typedef enum { switch__off, switch__on } switch_e;
+typedef char songname_t[256];
 typedef char songdata_t[512];
 
 // make into cli
+#define our_songname "Major Lazer  Too Original feat Elliphant  Jovi Rockwell Official Lyric Video.mp3"
 static void cli_sim_task(void *p) {
+  songname_t filename = "README.md"; // Will change name
   songname_t songname = {0};
-  strncpy(songname, "README.md", sizeof(songname - 1));
-
+  strncpy(songname, filename, sizeof(songname) - 1);
+  printf("SONGNAME: %s\n", songname);
   if (xQueueSend(song_name_queue, &songname, 100)) {
     puts("SUCESS: SONGNAME WAS SENT TO THE QUEUE");
   } else {
     puts("FAILED: SONGNAME WAS NOT SENT TO THE QUEUE");
   }
 
-  vTaskDelay(NULL);
+  vTaskSuspend(NULL);
 
   while (1) {
   }
@@ -58,24 +60,31 @@ static void cli_sim_task(void *p) {
 static void read_file(const char *filename) {
   printf("Request received to play/read: '%s'\n", filename);
 
-  FILE *file = f_open(filename, "rb");
-  if (NULL == file) {
+  FIL file;
+  FRESULT result = f_open(&file, filename, FA_READ);
+
+  if (!(result == FR_OK)) {
     puts("ERROR: Failed to open file");
   } else {
     songdata_t buffer = {0}; // zero initialize
-    int bytes_read = 0;
-    while ((bytes_read = f_read(buffer, 1, sizeof(buffer), file)) > 0) {
-      printf("Read a block of %d bytes from file\n", bytes_read);
-
-      // printf("Pointers are %p %p %p\n", buffer, &buffer[0], &buffer);
+    UINT bytes_read = 0;
+    if (FR_OK == f_read(&file, buffer, sizeof(buffer), &bytes_read)) {
       xQueueSend(song_data_queue, buffer, portMAX_DELAY);
-      // MAYBE WRONG: xQueueSend(mp3_song_data_queue, &buffer, portMAX_DELAY);
-      // Alternative: xQueueSend(mp3_song_data_queue, &buffer[0], portMAX_DELAY);
+    } else
+      puts("ERROR: Failed to read file");
 
-      memset(&buffer[0], 0, sizeof(buffer));
-    }
-    f_close(file);
+    /*
+        while ((bytes_read = fread(buffer, 1, sizeof(buffer), file)) > 0) {
+          printf("Read a block of %d bytes from file\n", bytes_read);
+
+          // printf("Pointers are %p %p %p\n", buffer, &buffer[0], &buffer);
+          xQueueSend(song_data_queue, buffer, portMAX_DELAY);
+          // MAYBE WRONG: xQueueSend(mp3_song_data_queue, &buffer, portMAX_DELAY);
+          // Alternative: xQueueSend(mp3_song_data_queue, &buffer[0], portMAX_DELAY);
+    */
+    memset(&buffer[0], 0, sizeof(buffer));
   }
+  f_close(&file);
 }
 
 static void mp3_file_reader_task(void *p) {
@@ -123,9 +132,9 @@ int main(void) {
   song_name_queue = xQueueCreate(1, sizeof(songname_t));
   song_data_queue = xQueueCreate(2, sizeof(songdata_t));
   puts("Starting RTOS");
-  xTaskCreate(cli_sim_task, "cli", 1, NULL, PRIORITY_MEDIUM, NULL);
-  xTaskCreate(mp3_file_reader_task, "reader", 1, NULL, PRIORITY_MEDIUM, NULL);
-  xTaskCreate(mp3_data_player_task, "player", 1, NULL, PRIORITY_HIGH, NULL);
+  xTaskCreate(cli_sim_task, "cli", 1024, NULL, PRIORITY_MEDIUM, NULL);
+  xTaskCreate(mp3_file_reader_task, "reader", 1024, NULL, PRIORITY_MEDIUM, NULL);
+  xTaskCreate(mp3_data_player_task, "player", 1024, NULL, PRIORITY_HIGH, NULL);
 
   vTaskStartScheduler(); // Ths function never returns unless RTOS scheduler runs out of memory and fails
   return 0;
