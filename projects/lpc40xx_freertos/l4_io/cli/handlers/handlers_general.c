@@ -72,3 +72,52 @@ static void cli__task_list_print(sl_string_t output_string, app_cli__print_strin
   cli_output(unused_cli_param, "configUSE_TRACE_FACILITY macro at FreeRTOSConfig.h must be non-zero\n");
 #endif
 }
+
+//=======================================
+#include "queue.h"
+QueueHandle_t song_name_queue;
+uint8_t pause; //We could use a pause flag appoarch as alternative
+
+static void cli__mp3_play(sl_string_t filename, app_cli__print_string_function cli_output) {
+  cli_output(NULL, "SENDING songname file: ");
+  cli_output(NULL, filename);
+  cli_output(NULL, "\n");
+  if (xQueueSend(song_name_queue, filename, 0)) {
+    cli_output(NULL, "SUCESS: SONGNAME WAS SENT TO THE QUEUE\n");
+  } else {
+    cli_output(NULL, "FAILED: SONGNAME WAS NOT SENT TO THE QUEUE\n");
+  }
+}
+
+static void cli__mp3_pause(app_cli__print_string_function cli_output) {
+  cli_output(NULL, "PAUSING song\n");
+  TaskHandle_t player_task = xTaskGetHandle("player");
+  vTaskSuspend(player_task);
+}
+
+static void cli__mp3_resume(app_cli__print_string_function cli_output) {
+  cli_output(NULL, "Resuming song\n");
+  TaskHandle_t player_task = xTaskGetHandle("player");
+  vTaskResume(player_task);
+}
+
+app_cli_status_e cli__mp3(app_cli__argument_t argument, sl_string_t user_input_minus_command_name,
+                          app_cli__print_string_function cli_output) {
+
+  sl_string_t s = user_input_minus_command_name;
+
+  // If the user types 'taskcontrol suspend led0' then we need to suspend a task with the name of 'led0'
+  // In this case, the user_input_minus_command_name will be set to 'suspend led0' with the command-name removed
+  if (sl_string__begins_with_ignore_case(s, "play")) {
+    sl_string__erase_first_word(s, ' '); // remove first word
+    cli__mp3_play(s, cli_output);
+  } else if (sl_string__begins_with_ignore_case(s, "pause")) {
+    cli__mp3_pause(cli_output);
+  } else if (sl_string__begins_with_ignore_case(s, "resume")) {
+    cli__mp3_resume(cli_output);
+  } else {
+    cli_output(NULL, "Did you mean to say suspend or resume?\n");
+  }
+
+  return APP_CLI_STATUS__SUCCESS;
+}

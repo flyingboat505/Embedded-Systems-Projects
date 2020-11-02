@@ -30,19 +30,19 @@ static void create_uart_task(void);
 static void blink_task(void *params);
 static void uart_task(void *params);
 
-static QueueHandle_t sensor_queue;
-static QueueHandle_t song_name_queue;
+QueueHandle_t song_name_queue;
 static QueueHandle_t song_data_queue;
 
 // typedef enum { switch__off, switch__on } switch_e;
 typedef char songname_t[256];
-typedef char songdata_t[512];
+typedef char songdata_t[512 / 2];
 
 // make into cli
 #define our_songname "Major Lazer  Too Original feat Elliphant  Jovi Rockwell Official Lyric Video.mp3"
 #define test_sample_mp3_file "Nature Beautiful short video 720p HD.mp3"
+/*
 static void cli_sim_task(void *p) {
-  songname_t filename = "Nature Beautiful short video 720p HD.mp3"; // Will change name
+  //songname_t filename = "README.md"; // Will change name
   songname_t songname = {0};
   strncpy(songname, filename, sizeof(songname) - 1);
   printf("SONGNAME: %s\n", songname);
@@ -53,7 +53,9 @@ static void cli_sim_task(void *p) {
   }
 
   vTaskSuspend(NULL);
-}
+}*/
+
+uint8_t pause = 0;
 
 static void read_file(const char *filename) {
   printf("Request received to play/read: '%s'\n", filename);
@@ -62,16 +64,17 @@ static void read_file(const char *filename) {
   } else {
     printf("FILE OPENED: file size: %i\n", f_size(&file));
     songdata_t buffer = {0}; // zero initialize
-    UINT bytes_read = 0; 
+    UINT bytes_read = 0;
 
     while (!f_eof(&file)) {
       if (FR_OK == f_read(&file, buffer, sizeof(buffer) - 1, &bytes_read)) {
-        printf("Block size: %i\n", bytes_read);
+        // printf("Block size: %i\n", bytes_read);
         xQueueSend(song_data_queue, buffer, portMAX_DELAY);
       } else
         puts("ERROR: Failed to read file");
       memset(&buffer[0], 0, sizeof(buffer)); // Write NULLs to all 256 bytes
     }
+    printf("Here\n");
     f_close(&file);
   }
 }
@@ -97,11 +100,11 @@ static void mp3_decoder_send_block(songdata_t data) {
      *   vTaskDelay(1);
      * }
      */
-    vTaskDelay(1);
-    // putchar(data[index]);
-    printf("0x%02X ", data[index]);
+    vTaskDelay(50);
+    putchar(data[index]);
+    // printf("0x%02X ", data[index]);
   }
-  printf("\n");
+  // printf("\n");
 }
 
 static void mp3_data_player_task(void *p) {
@@ -112,7 +115,6 @@ static void mp3_data_player_task(void *p) {
     if (xQueueReceive(song_data_queue, &songdata[0], portMAX_DELAY)) {
       mp3_decoder_send_block(songdata);
     }
-  }
 }
 
 //==========================================================
@@ -124,8 +126,9 @@ int main(void) {
   setvbuf(stdout, 0, _IONBF, 0);
   song_name_queue = xQueueCreate(1, sizeof(songname_t));
   song_data_queue = xQueueCreate(2, sizeof(songdata_t));
+  pause = 0;
   puts("Starting RTOS");
-  xTaskCreate(cli_sim_task, "cli", 1024, NULL, 1, NULL);
+  // xTaskCreate(cli_sim_task, "cli", 1024, NULL, 1, NULL);
   xTaskCreate(mp3_file_reader_task, "reader", 1024, NULL, 1, NULL);
   xTaskCreate(mp3_data_player_task, "player", 1024, NULL, 2, NULL);
 
