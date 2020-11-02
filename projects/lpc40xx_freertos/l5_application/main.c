@@ -40,51 +40,40 @@ typedef char songdata_t[512];
 
 // make into cli
 #define our_songname "Major Lazer  Too Original feat Elliphant  Jovi Rockwell Official Lyric Video.mp3"
+#define test_sample_mp3_file "Nature Beautiful short video 720p HD.mp3"
 static void cli_sim_task(void *p) {
-  songname_t filename = "README.md"; // Will change name
+  songname_t filename = "Nature Beautiful short video 720p HD.mp3"; // Will change name
   songname_t songname = {0};
   strncpy(songname, filename, sizeof(songname) - 1);
   printf("SONGNAME: %s\n", songname);
-  if (xQueueSend(song_name_queue, &songname, 100)) {
+  if (xQueueSend(song_name_queue, &songname, 0)) {
     puts("SUCESS: SONGNAME WAS SENT TO THE QUEUE");
   } else {
     puts("FAILED: SONGNAME WAS NOT SENT TO THE QUEUE");
   }
 
   vTaskSuspend(NULL);
-
-  while (1) {
-  }
 }
 
 static void read_file(const char *filename) {
   printf("Request received to play/read: '%s'\n", filename);
-
   FIL file;
-  FRESULT result = f_open(&file, filename, FA_READ);
-
-  if (!(result == FR_OK)) {
-    puts("ERROR: Failed to open file");
+  if (!(f_open(&file, filename, FA_OPEN_ALWAYS | FA_READ) == FR_OK)) {
   } else {
+    printf("FILE OPENED: file size: %i\n", f_size(&file));
     songdata_t buffer = {0}; // zero initialize
-    UINT bytes_read = 0;
-    if (FR_OK == f_read(&file, buffer, sizeof(buffer), &bytes_read)) {
-      xQueueSend(song_data_queue, buffer, portMAX_DELAY);
-    } else
-      puts("ERROR: Failed to read file");
+    UINT bytes_read = 0; 
 
-    /*
-        while ((bytes_read = fread(buffer, 1, sizeof(buffer), file)) > 0) {
-          printf("Read a block of %d bytes from file\n", bytes_read);
-
-          // printf("Pointers are %p %p %p\n", buffer, &buffer[0], &buffer);
-          xQueueSend(song_data_queue, buffer, portMAX_DELAY);
-          // MAYBE WRONG: xQueueSend(mp3_song_data_queue, &buffer, portMAX_DELAY);
-          // Alternative: xQueueSend(mp3_song_data_queue, &buffer[0], portMAX_DELAY);
-    */
-    memset(&buffer[0], 0, sizeof(buffer));
+    while (!f_eof(&file)) {
+      if (FR_OK == f_read(&file, buffer, sizeof(buffer) - 1, &bytes_read)) {
+        printf("Block size: %i\n", bytes_read);
+        xQueueSend(song_data_queue, buffer, portMAX_DELAY);
+      } else
+        puts("ERROR: Failed to read file");
+      memset(&buffer[0], 0, sizeof(buffer)); // Write NULLs to all 256 bytes
+    }
+    f_close(&file);
   }
-  f_close(&file);
 }
 
 static void mp3_file_reader_task(void *p) {
@@ -109,8 +98,10 @@ static void mp3_decoder_send_block(songdata_t data) {
      * }
      */
     vTaskDelay(1);
-    putchar(data[index]);
+    // putchar(data[index]);
+    printf("0x%02X ", data[index]);
   }
+  printf("\n");
 }
 
 static void mp3_data_player_task(void *p) {
@@ -129,12 +120,14 @@ static void mp3_data_player_task(void *p) {
 int main(void) {
   create_blinky_tasks();
   create_uart_task();
+
+  setvbuf(stdout, 0, _IONBF, 0);
   song_name_queue = xQueueCreate(1, sizeof(songname_t));
   song_data_queue = xQueueCreate(2, sizeof(songdata_t));
   puts("Starting RTOS");
-  xTaskCreate(cli_sim_task, "cli", 1024, NULL, PRIORITY_MEDIUM, NULL);
-  xTaskCreate(mp3_file_reader_task, "reader", 1024, NULL, PRIORITY_MEDIUM, NULL);
-  xTaskCreate(mp3_data_player_task, "player", 1024, NULL, PRIORITY_HIGH, NULL);
+  xTaskCreate(cli_sim_task, "cli", 1024, NULL, 1, NULL);
+  xTaskCreate(mp3_file_reader_task, "reader", 1024, NULL, 1, NULL);
+  xTaskCreate(mp3_data_player_task, "player", 1024, NULL, 2, NULL);
 
   vTaskStartScheduler(); // Ths function never returns unless RTOS scheduler runs out of memory and fails
   return 0;
