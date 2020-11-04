@@ -76,7 +76,7 @@ static void cli__task_list_print(sl_string_t output_string, app_cli__print_strin
 //=======================================
 #include "queue.h"
 QueueHandle_t song_name_queue;
-uint8_t pause; //We could use a pause flag appoarch as alternative
+uint8_t pause; // We could use a pause flag appoarch as alternative
 
 static void cli__mp3_play(sl_string_t filename, app_cli__print_string_function cli_output) {
   cli_output(NULL, "SENDING songname file: ");

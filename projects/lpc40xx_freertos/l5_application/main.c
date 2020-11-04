@@ -40,6 +40,7 @@ typedef char songdata_t[512 / 2];
 // make into cli
 #define our_songname "Major Lazer  Too Original feat Elliphant  Jovi Rockwell Official Lyric Video.mp3"
 #define test_sample_mp3_file "Nature Beautiful short video 720p HD.mp3"
+// song_test_file.mp3
 /*
 static void cli_sim_task(void *p) {
   //songname_t filename = "README.md"; // Will change name
@@ -51,7 +52,6 @@ static void cli_sim_task(void *p) {
   } else {
     puts("FAILED: SONGNAME WAS NOT SENT TO THE QUEUE");
   }
-
   vTaskSuspend(NULL);
 }*/
 
@@ -100,11 +100,11 @@ static void mp3_decoder_send_block(songdata_t data) {
      *   vTaskDelay(1);
      * }
      */
-    vTaskDelay(50);
-    putchar(data[index]);
-    // printf("0x%02X ", data[index]);
+    vTaskDelay(1);
+    // putchar(data[index]);
+    printf("0x%02X ", data[index]);
   }
-  // printf("\n");
+  printf("\n");
 }
 
 static void mp3_data_player_task(void *p) {
@@ -115,6 +115,7 @@ static void mp3_data_player_task(void *p) {
     if (xQueueReceive(song_data_queue, &songdata[0], portMAX_DELAY)) {
       mp3_decoder_send_block(songdata);
     }
+  }
 }
 
 //==========================================================
