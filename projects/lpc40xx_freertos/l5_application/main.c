@@ -127,7 +127,7 @@ static void test_lcd(void) {
   uint16_t DELAY = 300;
   lcd__write_string("<", LINE_1, 0, DELAY);
   lcd__write_string(">", LINE_1, 15, DELAY);
-  lcd__write_string("HELLO", LINE_1, 2, DELAY);
+  lcd__write_string("HELLO THERE", LINE_1, 2, DELAY);
   lcd__write_string("WORLD!", LINE_1, 2 + 5 + 1, DELAY);
   lcd__write_string("WELCOME TO CMPE", LINE_2, 0, DELAY);
 }

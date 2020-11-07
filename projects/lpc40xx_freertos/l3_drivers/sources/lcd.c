@@ -35,7 +35,8 @@ static void lcd__set_4_bitmode(void);
  *      P U B L I C   F U N C T I O N S
  *================================================
  */
-#define ENABLE_BLINKING_CURSOR 0 // Change this to non-zero to enable blinking cursor
+#define ENABLE_BLINKING 0 // Change this to non-zero to enable blinking
+#define DISPLAY_CURSOR 0  // Change this to non-zero to display cursor
 
 // Reference: http://web.alfredstate.edu/faculty/weimandn/lcd/lcd_initialization/lcd_initialization_index.html
 void lcd__init() {
@@ -46,15 +47,20 @@ void lcd__init() {
 
   lcd__set_4_bitmode();
 
+  uint8_t DISPLAY_mask = (1 << 2), CURSOR_mask = (1 << 1), BLINK_mask = (1 << 0);
+
   uint8_t FUNCTION_SET = 0b0010;
   uint8_t SET_2_LINE_DISPLAY = (FUNCTION_SET << 4) | (1 << 3);
-  uint8_t CLEAR_ON_OFF = (1 << 3);
+  uint8_t CLEAR_ON_OFF = (1 << 3) | ~(DISPLAY_mask | CURSOR_mask | BLINK_mask);
   uint8_t SET_CURSOR_HOME = (1 << 0);
   uint8_t SET_ENTRY_MODE = (0b11 << 1);
-  uint8_t DISPLAY_ON_OFF = 0b1111;
+  uint8_t DISPLAY_ON_OFF = (1 << 3) | (DISPLAY_mask | CURSOR_mask | BLINK_mask);
 
-#if !(ENABLE_BLINKING_CURSOR)
-  DISPLAY_ON_OFF &= ~0b11;
+#if !(ENABLE_BLINKING)
+  DISPLAY_ON_OFF &= ~BLINK_mask;
+#endif
+#if !(DISPLAY_CURSOR)
+  DISPLAY_ON_OFF &= ~CURSOR_mask;
 #endif
 
   lcd__send_instr_code(SET_2_LINE_DISPLAY);
@@ -66,11 +72,11 @@ void lcd__init() {
   lcd__send_instr_code(DISPLAY_ON_OFF);
 }
 void lcd__write_string(const string16_t STRING, LCD_LINE line, uint8_t ADDRESS_offset, uint16_t DELAY_in_ms) {
-  uint8_t SET_DRAM_ADDRESS = (1 << 7);
+  uint8_t SET_DRAM_ADDRESS_INSTR = (1 << 7);
   uint8_t FIRST_LINE_START_ADDRESS = 0x00, SECOND_LINE_START_ADDRESS = 0x40;
 
-  uint8_t INSTR_CODE =
-      (line) ? (SET_DRAM_ADDRESS | SECOND_LINE_START_ADDRESS) : (SET_DRAM_ADDRESS | FIRST_LINE_START_ADDRESS);
+  uint8_t INSTR_CODE = (line) ? (SET_DRAM_ADDRESS_INSTR | SECOND_LINE_START_ADDRESS)
+                              : (SET_DRAM_ADDRESS_INSTR | FIRST_LINE_START_ADDRESS);
 
   lcd__send_instr_code(INSTR_CODE + ADDRESS_offset);
 
