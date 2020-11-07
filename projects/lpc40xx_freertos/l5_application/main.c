@@ -119,12 +119,25 @@ static void mp3_data_player_task(void *p) {
 }
 
 //==========================================================
+#include "lcd.h"
+
+static void test_lcd(void) {
+  lcd__init();
+  puts("Initialization is DONE");
+  uint16_t DELAY = 300;
+  lcd__write_string("<", LINE_1, 0, DELAY);
+  lcd__write_string(">", LINE_1, 15, DELAY);
+  lcd__write_string("HELLO", LINE_1, 2, DELAY);
+  lcd__write_string("WORLD!", LINE_1, 2 + 5 + 1, DELAY);
+  lcd__write_string("WELCOME TO CMPE", LINE_2, 0, DELAY);
+}
 
 int main(void) {
   create_blinky_tasks();
   create_uart_task();
-
+  test_lcd();
   setvbuf(stdout, 0, _IONBF, 0);
+
   song_name_queue = xQueueCreate(1, sizeof(songname_t));
   song_data_queue = xQueueCreate(2, sizeof(songdata_t));
   pause = 0;
