@@ -11,7 +11,7 @@ typedef struct {
 } LCD_PINS_Typedef;
 
 static const LCD_PINS_Typedef LCD_PINS = {
-    {(gpio_s){2, 6}, (gpio_s){2, 8}, (gpio_s){0, 16}, (gpio_s){0, 17}}, (gpio_s){0, 22}, (gpio_s){0, 0}};
+    {(gpio_s){0, 17}, (gpio_s){0, 16}, (gpio_s){2, 8}, (gpio_s){2, 6}}, (gpio_s){0, 0}, (gpio_s){0, 22}};
 
 /*================================================
  *    P R I V A T E   F U N C T I O N S
@@ -51,7 +51,7 @@ void lcd__init() {
 
   uint8_t FUNCTION_SET = 0b0010;
   uint8_t SET_2_LINE_DISPLAY = (FUNCTION_SET << 4) | (1 << 3);
-  uint8_t CLEAR_ON_OFF = (1 << 3) | ~(DISPLAY_mask | CURSOR_mask | BLINK_mask);
+  uint8_t CLEAR_ON_OFF = (1 << 3) & ~(DISPLAY_mask | CURSOR_mask | BLINK_mask);
   uint8_t SET_CURSOR_HOME = (1 << 0);
   uint8_t SET_ENTRY_MODE = (0b11 << 1);
   uint8_t DISPLAY_ON_OFF = (1 << 3) | (DISPLAY_mask | CURSOR_mask | BLINK_mask);
