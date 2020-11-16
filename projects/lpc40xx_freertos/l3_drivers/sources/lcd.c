@@ -5,9 +5,9 @@
 #define DATA_BITS 4
 
 typedef struct {
-  gpio_s DATA[DATA_BITS];
-  gpio_s RS;
-  gpio_s EN;
+  gpio_s DATA[DATA_BITS]; // We only use 4 data pins: D7-D3 b/c LCD is set to 4 bit mode
+  gpio_s RS;              // Register Select
+  gpio_s EN;              // Enable
 } LCD_PINS_Typedef;
 
 static const LCD_PINS_Typedef LCD_PINS = {
@@ -35,6 +35,18 @@ static void lcd__set_4_bitmode(void);
  *      P U B L I C   F U N C T I O N S
  *================================================
  */
+
+void lcd__test_lcd(void) {
+  lcd__init();
+  puts("Initialization is DONE");
+  uint16_t DELAY = 100;
+  lcd__write_string("<", LINE_1, 0, DELAY);
+  lcd__write_string(">", LINE_1, 15, DELAY);
+  lcd__write_string("HELLO THERE", LINE_1, 2, DELAY);
+  lcd__write_string("WORLD!", LINE_1, 2 + 5 + 1, DELAY);
+  lcd__write_string("WELCOME TO CMPE", LINE_2, 0, DELAY);
+}
+
 #define ENABLE_BLINKING 0 // Change this to non-zero to enable blinking
 #define DISPLAY_CURSOR 0  // Change this to non-zero to display cursor
 
@@ -80,6 +92,10 @@ void lcd__write_string(const string16_t STRING, LCD_LINE line, uint8_t ADDRESS_o
 
   lcd__send_instr_code(INSTR_CODE + ADDRESS_offset);
 
+  /* Note that string16_t has size of 17 b/c 1 extra space is added to accomodate NULL termination
+   * Subtract sizeof(string16_t) by 1 would give 16
+   * Subtract Address_offset to prevent out of boundary
+   */
   for (uint8_t INDEX = 0; INDEX < (sizeof(string16_t) - 1 - ADDRESS_offset) && STRING[INDEX] != '\0'; INDEX++) {
     if (DELAY_in_ms) // Don't call this function if delay is 0. Can cause minor delays and it's kinda noticable
       delay__ms(DELAY_in_ms);

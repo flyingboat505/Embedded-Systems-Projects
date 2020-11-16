@@ -24,6 +24,8 @@
 #include "uart_lab.h"
 #include <string.h>
 
+#include "MP3_decoder.h"
+
 // testing
 static void create_blinky_tasks(void);
 static void create_uart_task(void);
@@ -35,25 +37,12 @@ static QueueHandle_t song_data_queue;
 
 // typedef enum { switch__off, switch__on } switch_e;
 typedef char songname_t[256];
-typedef char songdata_t[512 / 2];
+typedef char songdata_t[512];
 
 // make into cli
 #define our_songname "Major Lazer  Too Original feat Elliphant  Jovi Rockwell Official Lyric Video.mp3"
 #define test_sample_mp3_file "Nature Beautiful short video 720p HD.mp3"
 // song_test_file.mp3
-/*
-static void cli_sim_task(void *p) {
-  //songname_t filename = "README.md"; // Will change name
-  songname_t songname = {0};
-  strncpy(songname, filename, sizeof(songname) - 1);
-  printf("SONGNAME: %s\n", songname);
-  if (xQueueSend(song_name_queue, &songname, 0)) {
-    puts("SUCESS: SONGNAME WAS SENT TO THE QUEUE");
-  } else {
-    puts("FAILED: SONGNAME WAS NOT SENT TO THE QUEUE");
-  }
-  vTaskSuspend(NULL);
-}*/
 
 uint8_t pause = 0;
 
@@ -92,19 +81,55 @@ static void mp3_file_reader_task(void *p) {
 }
 
 static void mp3_decoder_send_block(songdata_t data) {
+  size_t BYTE_SEND = 32;
+  for (size_t index = 0; index < sizeof(songdata_t); index += BYTE_SEND) {
+    MP3_decoder__send_data((uint8_t *)&data[index], BYTE_SEND);
+  }
+  /*char c;
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   for (size_t index = 0; index < sizeof(songdata_t); index++) {
-    /* Real code for your SJ2
+     Real code for your SJ2
      * if (mp3_decoder_gpio_is_high) {
-     *   spi_exchange(data[index]);
+         spi_exchange(data[index]);
      * } else {
      *   vTaskDelay(1);
      * }
-     */
     vTaskDelay(1);
     // putchar(data[index]);
-    printf("0x%02X ", data[index]);
+    // printf("0x%02X ", data[index]);
+    c = data[index];
+    printf("%c ", c);
   }
-  printf("\n");
+  printf("\n");*/
 }
 
 static void mp3_data_player_task(void *p) {
@@ -119,23 +144,24 @@ static void mp3_data_player_task(void *p) {
 }
 
 //==========================================================
-#include "lcd.h"
-
-static void test_lcd(void) {
-  lcd__init();
-  puts("Initialization is DONE");
-  uint16_t DELAY = 300;
-  lcd__write_string("<", LINE_1, 0, DELAY);
-  lcd__write_string(">", LINE_1, 15, DELAY);
-  lcd__write_string("HELLO THERE", LINE_1, 2, DELAY);
-  lcd__write_string("WORLD!", LINE_1, 2 + 5 + 1, DELAY);
-  lcd__write_string("WELCOME TO CMPE", LINE_2, 0, DELAY);
+void decoder_test(void) {
+  MP3_decoder__init();
+  printf("Testing Decoder...\n");
+  uint8_t n = 0;
+  while (1) {
+    printf("0x%04X\n", sci_read(0xB));
+    MP3_decoder__sine_test(126, 1000);
+    delay__ms(500);
+  }
 }
+#include "lcd.h"
 
 int main(void) {
   create_blinky_tasks();
   create_uart_task();
-  test_lcd();
+  // lcd__test_lcd();
+  decoder_test();
+
   setvbuf(stdout, 0, _IONBF, 0);
 
   song_name_queue = xQueueCreate(1, sizeof(songname_t));
