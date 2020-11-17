@@ -86,35 +86,6 @@ static void mp3_decoder_send_block(songdata_t data) {
     MP3_decoder__send_data((uint8_t *)&data[index], BYTE_SEND);
   }
   /*char c;
-  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   for (size_t index = 0; index < sizeof(songdata_t); index++) {
      Real code for your SJ2
@@ -140,19 +111,24 @@ static void mp3_data_player_task(void *p) {
     if (xQueueReceive(song_data_queue, &songdata[0], portMAX_DELAY)) {
       mp3_decoder_send_block(songdata);
     }
+    while (pause) {
+      vTaskDelay(1);
+    }
   }
 }
 
 //==========================================================
 void decoder_test(void) {
   MP3_decoder__init();
+  MP3_decoder__set_volume(0, 0);
   printf("Testing Decoder...\n");
   uint8_t n = 0;
-  while (1) {
-    printf("0x%04X\n", sci_read(0xB));
-    MP3_decoder__sine_test(126, 1000);
-    delay__ms(500);
-  }
+  // while (1) {
+  printf("0x%04X\n", sci_read(0xB));
+  MP3_decoder__sine_test(126, 3000);
+  delay__ms(500);
+  // }
+  // MP3_decoder__set_volume(0, 0);
 }
 #include "lcd.h"
 

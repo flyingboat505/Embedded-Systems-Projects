@@ -39,8 +39,10 @@ static uint16_t MP3_decoder__sci_read(uint8_t address) {
   return data;
 }
 
+// Public Function For Debugging.
 uint16_t sci_read(uint8_t address) { return MP3_decoder__sci_read(address); }
 
+// 0x2 opcode for sci_write
 static void MP3_decoder__sci_write(uint8_t address, uint16_t data) {
   MP3_decoder__enable_CS();
   ssp2__exchange_byte(0x2);
@@ -52,23 +54,23 @@ static void MP3_decoder__sci_write(uint8_t address, uint16_t data) {
 
 static void MP3_decoder__softreset(void) {
   MP3_decoder__sci_write(VS1053_REG_MODE, VS1053_MODE_SM_SDINEW | VS1053_MODE_SM_RESET);
-  delay__us(100);
+  delay__ms(100);
 }
 
 static void MP3_decoder__reset(void) {
   if (!gpio__get(decoder_reset)) {
     gpio__reset(decoder_reset);
-    delay__us(100);
+    delay__ms(100);
     gpio__set(decoder_reset);
   }
   gpio__set(decoder_CS);
   gpio__set(decoder_XDCS);
-  delay__us(100);
+  delay__ms(100);
   MP3_decoder__softreset();
-  delay__us(100);
+  delay__ms(100);
 
   MP3_decoder__sci_write(0x3, 0x6000);
-  MP3_decoder__set_volume(40, 40);
+  // MP3_decoder__set_volume(0, 0);
 }
 
 void MP3_decoder__init(void) { // Will add pin number in these parameter later...
@@ -87,15 +89,16 @@ void MP3_decoder__init(void) { // Will add pin number in these parameter later..
   gpio__set_as_output(decoder_XDCS);
   gpio__set_as_input(decoder_DREQ);
 
-  ssp2__initialize(1200); // 1khz?
+  ssp2__initialize(1000); // 1khz?
   MP3_decoder__reset();
+  MP3_decoder__sci_write(0x02, 0x050F);
 }
 void MP3_decoder__set_volume(uint8_t left, uint8_t right) {
   MP3_decoder__sci_write(VS1053_REG_VOLUME, (left << 8) | right);
 }
 
 void MP3_decoder__send_data(uint8_t *data, size_t BYTE) {
-  MP3_decoder__reset();
+  // MP3_decoder__reset();
   MP3_decoder__enable_XDCS();
   while (!gpio__get(decoder_DREQ)) {
     ;
@@ -116,33 +119,36 @@ void MP3_decoder__sine_test(uint8_t n, uint16_t delay_in_ms) {
     ;
   }
 
-  MP3_decoder__enable_CS();
+  MP3_decoder__enable_XDCS();
+  // delay__ms(10);
   ssp2__exchange_byte(0x53);
   ssp2__exchange_byte(0xEF);
   ssp2__exchange_byte(0x6E);
   ssp2__exchange_byte(n);
-  /*for (uint8_t iteration = 0; iteration < 4; iteration++)
-    ssp2__exchange_byte(0x0);*/
+  for (uint8_t iteration = 0; iteration < 4; iteration++)
+    ssp2__exchange_byte(0x0);
+  /*ssp2__exchange_byte(0x00);
   ssp2__exchange_byte(0x00);
   ssp2__exchange_byte(0x00);
-  ssp2__exchange_byte(0x00);
-  ssp2__exchange_byte(0x00);
-
-  MP3_decoder__disable_CS();
+  ssp2__exchange_byte(0x00);*/
+  // delay__ms(1000);
+  MP3_decoder__disable_XDCS();
 
   delay__ms(delay_in_ms);
 
-  MP3_decoder__enable_CS();
+  MP3_decoder__enable_XDCS();
+  // delay__ms(10);
   ssp2__exchange_byte(0x45);
   ssp2__exchange_byte(0x78);
   ssp2__exchange_byte(0x69);
   ssp2__exchange_byte(0x74);
-  /*
+
   for (uint8_t iteration = 0; iteration < 4; iteration++)
-    ssp2__exchange_byte(0x0);*/
+    ssp2__exchange_byte(0x0);
+  /*ssp2__exchange_byte(0x00);
   ssp2__exchange_byte(0x00);
   ssp2__exchange_byte(0x00);
-  ssp2__exchange_byte(0x00);
-  ssp2__exchange_byte(0x00);
-  MP3_decoder__disable_CS();
+  ssp2__exchange_byte(0x00);*/
+  // delay__ms(1000);
+  MP3_decoder__disable_XDCS();
 }

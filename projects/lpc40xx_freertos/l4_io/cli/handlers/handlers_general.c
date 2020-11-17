@@ -91,14 +91,16 @@ static void cli__mp3_play(sl_string_t filename, app_cli__print_string_function c
 
 static void cli__mp3_pause(app_cli__print_string_function cli_output) {
   cli_output(NULL, "PAUSING song\n");
-  TaskHandle_t player_task = xTaskGetHandle("player");
-  vTaskSuspend(player_task);
+  pause = 1;
+  // TaskHandle_t player_task = xTaskGetHandle("player");
+  // vTaskSuspend(player_task);
 }
 
 static void cli__mp3_resume(app_cli__print_string_function cli_output) {
   cli_output(NULL, "Resuming song\n");
-  TaskHandle_t player_task = xTaskGetHandle("player");
-  vTaskResume(player_task);
+  pause = 0;
+  // TaskHandle_t player_task = xTaskGetHandle("player");
+  // vTaskResume(player_task);
 }
 
 app_cli_status_e cli__mp3(app_cli__argument_t argument, sl_string_t user_input_minus_command_name,
