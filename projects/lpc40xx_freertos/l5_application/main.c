@@ -49,11 +49,24 @@ uint8_t pause = 0;
 static void read_file(const char *filename) {
   printf("Request received to play/read: '%s'\n", filename);
   FIL file;
-  if (!(f_open(&file, filename, FA_OPEN_ALWAYS | FA_READ) == FR_OK)) {
+  if (!(f_open(&file, filename, FA_OPEN_EXISTING | FA_READ) == FR_OK)) {
   } else {
     printf("FILE OPENED: file size: %i\n", f_size(&file));
     songdata_t buffer = {0}; // zero initialize
     UINT bytes_read = 0;
+
+    // FIL res = f_lseek(fp, f_size(file) - 128);
+    /*if (f_lseek(&file, 122) == FR_OK) {
+      if (f_read(&file, buffer, 30, &bytes_read) == FR_OK) {
+        for (size_t INDEX = 0; INDEX < 30; INDEX++) {
+          printf("|%c", buffer[INDEX]);
+        }
+      } else {
+        printf("Err @ read\n");
+      }
+    } else {
+      printf("Err @ seek\n");
+    }*/
 
     while (!f_eof(&file)) {
       if (FR_OK == f_read(&file, buffer, sizeof(buffer) - 1, &bytes_read)) {
@@ -82,7 +95,7 @@ static void mp3_file_reader_task(void *p) {
 
 static void mp3_decoder_send_block(songdata_t data) {
   size_t BYTE_SEND = 32;
-  for (size_t index = 0; index < sizeof(songdata_t); index += BYTE_SEND) {
+  for (size_t index = 0; index < sizeof(songdata_t); index += BYTE_SEND) { // index += 32
     MP3_decoder__send_data((uint8_t *)&data[index], BYTE_SEND);
   }
   /*char c;
@@ -130,13 +143,20 @@ void decoder_test(void) {
   // }
   // MP3_decoder__set_volume(0, 0);
 }
+#include "MP3_song.h"
 #include "lcd.h"
+
+static void test_pop_file(void) {
+  MP3_song__init();
+  MP3_song__print();
+}
 
 int main(void) {
   create_blinky_tasks();
   create_uart_task();
+  test_pop_file();
   // lcd__test_lcd();
-  decoder_test();
+  // decoder_test();
 
   setvbuf(stdout, 0, _IONBF, 0);
 
@@ -145,8 +165,8 @@ int main(void) {
   pause = 0;
   puts("Starting RTOS");
   // xTaskCreate(cli_sim_task, "cli", 1024, NULL, 1, NULL);
-  xTaskCreate(mp3_file_reader_task, "reader", 1024, NULL, 1, NULL);
-  xTaskCreate(mp3_data_player_task, "player", 1024, NULL, 2, NULL);
+  xTaskCreate(mp3_file_reader_task, "reader", 1024 / sizeof(void *), NULL, 1, NULL);
+  xTaskCreate(mp3_data_player_task, "player", 1024 / sizeof(void *), NULL, 2, NULL);
 
   vTaskStartScheduler(); // Ths function never returns unless RTOS scheduler runs out of memory and fails
   return 0;
