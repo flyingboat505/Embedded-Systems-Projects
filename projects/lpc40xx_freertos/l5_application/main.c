@@ -24,7 +24,7 @@
 #include "uart_lab.h"
 #include <string.h>
 
-#include "MP3_decoder.h"
+#include "MP3_task.h"
 
 // testing
 static void create_blinky_tasks(void);
@@ -32,141 +32,11 @@ static void create_uart_task(void);
 static void blink_task(void *params);
 static void uart_task(void *params);
 
-QueueHandle_t song_name_queue;
-static QueueHandle_t song_data_queue;
-
-// typedef enum { switch__off, switch__on } switch_e;
-typedef char songname_t[256];
-typedef char songdata_t[512];
-
-// make into cli
-#define our_songname "Major Lazer  Too Original feat Elliphant  Jovi Rockwell Official Lyric Video.mp3"
-#define test_sample_mp3_file "Nature Beautiful short video 720p HD.mp3"
-// song_test_file.mp3
-
-uint8_t pause = 0;
-
-static void read_file(const char *filename) {
-  printf("Request received to play/read: '%s'\n", filename);
-  FIL file;
-  if (!(f_open(&file, filename, FA_OPEN_EXISTING | FA_READ) == FR_OK)) {
-  } else {
-    printf("FILE OPENED: file size: %i\n", f_size(&file));
-    songdata_t buffer = {0}; // zero initialize
-    UINT bytes_read = 0;
-
-    // FIL res = f_lseek(fp, f_size(file) - 128);
-    /*if (f_lseek(&file, 122) == FR_OK) {
-      if (f_read(&file, buffer, 30, &bytes_read) == FR_OK) {
-        for (size_t INDEX = 0; INDEX < 30; INDEX++) {
-          printf("|%c", buffer[INDEX]);
-        }
-      } else {
-        printf("Err @ read\n");
-      }
-    } else {
-      printf("Err @ seek\n");
-    }*/
-
-    while (!f_eof(&file)) {
-      if (FR_OK == f_read(&file, buffer, sizeof(buffer) - 1, &bytes_read)) {
-        // printf("Block size: %i\n", bytes_read);
-        xQueueSend(song_data_queue, buffer, portMAX_DELAY);
-      } else
-        puts("ERROR: Failed to read file");
-      memset(&buffer[0], 0, sizeof(buffer)); // Write NULLs to all 256 bytes
-    }
-    printf("Here\n");
-    f_close(&file);
-  }
-}
-
-static void mp3_file_reader_task(void *p) {
-  songname_t songname = {0};
-
-  while (1) {
-    if (xQueueReceive(song_name_queue, songname, 3000)) {
-      read_file(songname);
-    } else {
-      puts("WARNING: No new request to read a file");
-    }
-  }
-}
-
-static void mp3_decoder_send_block(songdata_t data) {
-  size_t BYTE_SEND = 32;
-  for (size_t index = 0; index < sizeof(songdata_t); index += BYTE_SEND) { // index += 32
-    MP3_decoder__send_data((uint8_t *)&data[index], BYTE_SEND);
-  }
-  /*char c;
-
-  for (size_t index = 0; index < sizeof(songdata_t); index++) {
-     Real code for your SJ2
-     * if (mp3_decoder_gpio_is_high) {
-         spi_exchange(data[index]);
-     * } else {
-     *   vTaskDelay(1);
-     * }
-    vTaskDelay(1);
-    // putchar(data[index]);
-    // printf("0x%02X ", data[index]);
-    c = data[index];
-    printf("%c ", c);
-  }
-  printf("\n");*/
-}
-
-static void mp3_data_player_task(void *p) {
-  songdata_t songdata;
-
-  while (1) {
-    memset(&songdata[0], 0, sizeof(songdata_t));
-    if (xQueueReceive(song_data_queue, &songdata[0], portMAX_DELAY)) {
-      mp3_decoder_send_block(songdata);
-    }
-    while (pause) {
-      vTaskDelay(1);
-    }
-  }
-}
-
-//==========================================================
-void decoder_test(void) {
-  MP3_decoder__init();
-  MP3_decoder__set_volume(0, 0);
-  printf("Testing Decoder...\n");
-  uint8_t n = 0;
-  // while (1) {
-  printf("0x%04X\n", sci_read(0xB));
-  MP3_decoder__sine_test(126, 3000);
-  delay__ms(500);
-  // }
-  // MP3_decoder__set_volume(0, 0);
-}
-#include "MP3_song.h"
-#include "lcd.h"
-
-static void test_pop_file(void) {
-  MP3_song__init();
-  MP3_song__print();
-}
-
 int main(void) {
   create_blinky_tasks();
   create_uart_task();
-  test_pop_file();
-  // lcd__test_lcd();
-  // decoder_test();
 
-  setvbuf(stdout, 0, _IONBF, 0);
-
-  song_name_queue = xQueueCreate(1, sizeof(songname_t));
-  song_data_queue = xQueueCreate(2, sizeof(songdata_t));
-  pause = 0;
-  puts("Starting RTOS");
-  // xTaskCreate(cli_sim_task, "cli", 1024, NULL, 1, NULL);
-  xTaskCreate(mp3_file_reader_task, "reader", 1024 / sizeof(void *), NULL, 1, NULL);
-  xTaskCreate(mp3_data_player_task, "player", 1024 / sizeof(void *), NULL, 2, NULL);
+  MP3_task__set_up();
 
   vTaskStartScheduler(); // Ths function never returns unless RTOS scheduler runs out of memory and fails
   return 0;

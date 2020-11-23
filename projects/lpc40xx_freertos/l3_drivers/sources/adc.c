@@ -51,8 +51,30 @@ uint16_t adc__get_adc_value(adc_channel_e channel_num) {
 
   return result;
 }
+
+/*
 // Choosing Hardware Mehthod (Burst Mode=1)
 void adc__enable_burst_mode() {
   LPC_ADC->CR |= (1 << 16);  // burst to 1
   LPC_ADC->CR &= ~(7 << 24); // start to 000
+}*/
+
+void adc__enable_burst_mode(void) {
+  const uint32_t burst_conversion_mask = (1 << 16), start_conversion_mask = (7 << 24);
+  // LPC_ADC->CR |= (start_conversion_mask | burst_conversion_mask); // Enable burst, but disable start of conversion
+  LPC_ADC->CR |= (burst_conversion_mask);
+  LPC_ADC->CR &= ~(start_conversion_mask);
+}
+
+uint16_t adc__get_channel_reading_with_burst_mode(adc_channel_e channel_num) {
+  // printf("%d\n", channel);
+
+  uint16_t result = 0;
+  const uint32_t channel_masks = 0xFF; // To mask 8 bits/ first 8 are selecting AD channels
+
+  LPC_ADC->CR &= ~channel_masks;     // clearing all AD[7:0] bits
+  LPC_ADC->CR |= (1 << channel_num); // selecting one AD[channel_num]
+  result = (LPC_ADC->DR[channel_num] >> 4) & 0xFFF;
+
+  return result;
 }

@@ -11,10 +11,16 @@ static const gpio_s decoder_SCLK = {1, 0};
 static const gpio_s decoder_MOSI = {1, 1};
 static const gpio_s decoder_MISO = {1, 4};
 
+static const gpio_s decoder_reset = {0, 8};
+static const gpio_s decoder_CS = {0, 26};
+static const gpio_s decoder_XDCS = {1, 31};
+static const gpio_s decoder_DREQ = {1, 20};
+/*
 static const gpio_s decoder_reset = {1, 20};
 static const gpio_s decoder_CS = {1, 28};
 static const gpio_s decoder_XDCS = {2, 0};
 static const gpio_s decoder_DREQ = {2, 2};
+*/
 
 static void MP3_decoder__enable_XDCS(void) { gpio__reset(decoder_XDCS); }
 
