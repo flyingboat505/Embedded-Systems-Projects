@@ -60,7 +60,7 @@ static void read_file(const char *filename) {
         xQueueSend(song_data_queue, buffer, portMAX_DELAY);
       } else
         puts("ERROR: Failed to read file");
-      memset(&buffer[0], 0, sizeof(buffer)); // Write NULLs to all 256 bytes
+      // memset(&buffer[0], 0, sizeof(buffer)); // Write NULLs to all 256 bytes
     }
     f_close(&file);
   }
@@ -78,7 +78,7 @@ static void mp3_file_reader_task(void *p) {
 }
 
 static void mp3_decoder_send_block(songdata_t data) {
-  size_t BYTE_SEND = 32;
+  size_t BYTE_SEND = 4;
   for (size_t index = 0; index < sizeof(songdata_t); index += BYTE_SEND) { // index += 32
     MP3_decoder__send_data((uint8_t *)&data[index], BYTE_SEND);
   }
@@ -95,7 +95,7 @@ static void mp3_data_player_task(void *p) {
   // uint8_t volume;
 
   while (1) {
-    memset(&songdata[0], 0, sizeof(songdata_t));
+    // memset(&songdata[0], 0, sizeof(songdata_t));
     if (xQueueReceive(song_data_queue, &songdata[0], portMAX_DELAY)) {
       mp3_decoder_send_block(songdata);
     }
@@ -126,12 +126,12 @@ static void mp3_adjust_volume(void *p) {
       adc_value = adc__get_adc_value(ADC__CHANNEL_4);
       volume = (adc_value * 0xFE / 4095);
       MP3_decoder__set_volume(0xFE, volume);
-      volume = 99 - (volume * 99 / 0xFE);
+      /*volume = 99 - (volume * 99 / 0xFE);
       if (volume < 10)
         sprintf(volume_display, " %d", volume);
       else
         sprintf(volume_display, "%d", volume);
-      lcd__write_string(volume_display, LINE_2, 14, 0);
+      lcd__write_string(volume_display, LINE_2, 14, 0);*/
     }
   }
 }
@@ -195,6 +195,6 @@ void MP3_task__set_up(void) {
   // xTaskCreate(cli_sim_task, "cli", 1024, NULL, 1, NULL);
   xTaskCreate(mp3_file_reader_task, "reader", 2048 / sizeof(void *), NULL, 1, NULL);
   xTaskCreate(mp3_data_player_task, "player", 2048 / sizeof(void *), NULL, 2, NULL);
-  xTaskCreate(mp3_adjust_volume, "volume", 1024 / sizeof(void *), NULL, 1, NULL);
+  xTaskCreate(mp3_adjust_volume, "volume", 1024 / sizeof(void *), NULL, 2, NULL);
   xTaskCreate(mp3__interrupt_handler_task, "mp3_interrupt", 1024 / sizeof(void *), NULL, 3, NULL);
 }
