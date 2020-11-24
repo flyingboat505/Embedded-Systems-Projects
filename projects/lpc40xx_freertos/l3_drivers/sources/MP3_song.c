@@ -44,6 +44,10 @@ void MP3_song__prev(void) {
   // display song name into LCD
 }
 
+void MP3_song__set_index(uint8_t index) { cur_song_index = index; }
+
+uint8_t MP3_song__get_size(void) { return song_size; }
+
 SONGS MP3_song__search_by_index(uint8_t key) {
   cur_song_index = key;
   return song_list[key];

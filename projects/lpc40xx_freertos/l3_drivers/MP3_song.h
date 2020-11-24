@@ -23,6 +23,10 @@ void MP3_song__next(void);
 
 void MP3_song__prev(void);
 
+void MP3_song__set_index(uint8_t);
+
+uint8_t MP3_song__get_size(void);
+
 SONGS MP3_song__search_by_index(uint8_t);
 
 void MP3_song__print(void);

@@ -53,7 +53,8 @@ static void read_file(const char *filename) {
     printf("FILE OPENED: file size: %i\n", f_size(&file));
     songdata_t buffer = {0}; // zero initialize
     UINT bytes_read = 0;
-    while (!f_eof(&file)) {
+    uint8_t song_play_index = MP3_menu__get_cur_song_index();
+    while (!f_eof(&file) && song_play_index == MP3_menu__get_cur_song_index()) {
       if (FR_OK == f_read(&file, buffer, sizeof(buffer) - 1, &bytes_read)) {
         // printf("Block size: %i\n", bytes_read);
         xQueueSend(song_data_queue, buffer, portMAX_DELAY);
@@ -86,12 +87,12 @@ static void mp3_decoder_send_block(songdata_t data) {
 static SemaphoreHandle_t volume_handler_semaphore;
 
 static void mp3_data_player_task(void *p) {
-  string16_t volume_display;
+  // string16_t volume_display;
 
   songdata_t songdata;
 
-  uint16_t adc_value;
-  uint8_t volume;
+  // uint16_t adc_value;
+  // uint8_t volume;
 
   while (1) {
     memset(&songdata[0], 0, sizeof(songdata_t));
@@ -140,6 +141,18 @@ QueueHandle_t keypad_char_queue;
 static void mp3__interrupt_handler_task(void *p) {
   unsigned char key_press;
   while (1) {
+    if (xQueueReceive(keypad_char_queue, &key_press, portMAX_DELAY)) {
+      printf("%c\n", key_press);
+      MP3_keypad__disable_interrupt();
+      if (key_press == '^') {
+        MP3_menu__main_menu_scroll_up();
+      } else if (key_press == 'V') {
+        MP3_menu__main_menu_scroll_down();
+      } else if (key_press == 'E') {
+        MP3_menu__song_handler();
+      }
+    }
+    MP3_keypad__enable_interrupt();
   }
 }
 //==========================================================
@@ -167,7 +180,7 @@ static void test_pop_file(void) {
 
 void MP3_task__set_up(void) {
   adc_setup();
-  mp3_menu__setup();
+  MP3_menu__init();
   MP3_keypad__init();
   decoder_test();
   // lcd__test_lcd();
@@ -183,4 +196,5 @@ void MP3_task__set_up(void) {
   xTaskCreate(mp3_file_reader_task, "reader", 2048 / sizeof(void *), NULL, 1, NULL);
   xTaskCreate(mp3_data_player_task, "player", 2048 / sizeof(void *), NULL, 2, NULL);
   xTaskCreate(mp3_adjust_volume, "volume", 1024 / sizeof(void *), NULL, 1, NULL);
+  xTaskCreate(mp3__interrupt_handler_task, "mp3_interrupt", 1024 / sizeof(void *), NULL, 3, NULL);
 }

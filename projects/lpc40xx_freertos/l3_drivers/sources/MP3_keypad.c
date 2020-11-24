@@ -84,6 +84,10 @@ static void configure_pin_as_GPIO(void) {
   gpio__set_function(keypad_int, 0);
 }
 
+void MP3_keypad__enable_interrupt(void) { LPC_GPIOINT->IO0IntEnR |= (1 << (keypad_int.pin_number)); }
+
+void MP3_keypad__disable_interrupt(void) { LPC_GPIOINT->IO0IntEnR &= ~(1 << (keypad_int.pin_number)); }
+
 void MP3_keypad__init(void) {
   configure_pin_as_GPIO();
   for (size_t INDEX = 0; INDEX < keypad_size; INDEX++) {
@@ -94,7 +98,7 @@ void MP3_keypad__init(void) {
   MP3_refresh__interrupt();
 
   lpc_peripheral__enable_interrupt(LPC_PERIPHERAL__GPIO, MP3_keypad__ISR, "Keypad_Interrupt");
-  LPC_GPIOINT->IO0IntEnR |= (1 << (keypad_int.pin_number));
+  MP3_keypad__enable_interrupt();
   NVIC_EnableIRQ(GPIO_IRQn);
 
   printf("keypad ready\n");
