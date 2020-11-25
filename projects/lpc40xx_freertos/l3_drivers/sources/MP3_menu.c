@@ -13,8 +13,28 @@ static size_t cur_play_song = -1;
 extern uint8_t pause;
 
 //==================================================================
+//               T A B L E   O F    C O N T E N T
+//==================================================================
+// Note: Unused Functions. Use for redirecting under this source file
+// Right click function name and go to definition;
+static void Redirect_to_reboot_code();
+static void Redirect_to_login_code();
+
+//==================================================================
+
+//==================================================================
+//                      G E N E R I C
+//==================================================================
+#define SCROLL_UP '^'
+#define SCROLL_DOWN 'V'
+#define ENTER 'E'
+
+//==================================================================
 //                         R E B O O T
 //==================================================================
+static void Redirect_to_reboot_code() {}
+//-----------------------------------
+
 static void MP3_menu__rebooting_mp3(void) {
   lcd__write_string("REBOOTING", LINE_1, 3, 100);
   lcd__write_string("MP3 PLAYER...", LINE_2, 1, 100);
@@ -24,7 +44,14 @@ static void MP3_menu__rebooting_mp3(void) {
 //==================================================================
 //                          L O G I N
 //==================================================================
-#define passcode 1234
+static void Redirect_to_login_code() {}
+//-----------------------------------
+
+#define LOGIN_number_of_digits 4
+#define LOGIN_clear_key 'B'
+
+#define LOGIN_passcode 1234
+
 static uint8_t pin_count = 0;
 static uint16_t entered_pin = 0;
 static LOGIN_stats LOG_stats = IN_PROCESS;
@@ -39,55 +66,99 @@ static void MP3_menu__LOGIN_unlock_menu_page(void) {
   vTaskResume(xTaskGetHandle("player"));
   vTaskResume(xTaskGetHandle("volume"));
 }
-static void MP3_menu_LOGIN_refresh_passcode(void) {
+
+static void MP3_menu__LOGIN_setup_passcode_UI(void) {
+  lcd__write_string(">             ", LINE_2, 0, 0);
+  Page_Display = login;
+}
+
+static void MP3_menu__LOGIN_refresh_passcode(void) {
   LOG_stats = IN_PROCESS;
   pin_count = 0;
   entered_pin = 0;
   lcd__write_string("           ", LINE_2, 1, 0);
 }
 
-static void MP3_menu_LOGIN_handle_incorrect_passcode(void) {
+static void MP3_menu__LOGIN_handle_incorrect_passcode(void) {
   LOG_stats = INCORRECT;
   delay__ms(500);
   lcd__write_string("INCORRECT", LINE_2, 1, 0);
 }
 
-static void MP3_menu_LOGIN_handle_correct_passcode(void) {
+static void MP3_menu__MAIN_MENU_refresh(void); // Need to declare this function here
+static void MP3_menu__LOGIN_handle_correct_passcode(void) {
   LOG_stats = SUCCESS;
   delay__ms(500);
   lcd__write_string("               ", LINE_1, 1, 0);
+  lcd__write_string("               ", LINE_2, 0, 0);
   lcd__write_string("WELCOME!", LINE_1, 4, 100);
-  lcd__write_string("       ...    ", LINE_2, 0, 100);
+  lcd__write_string("      ...    ", LINE_2, 0, 100);
   delay__ms(1000);
   Page_Display = main_menu;
+  MP3_menu__MAIN_MENU_refresh();
   MP3_menu__LOGIN_unlock_menu_page();
 }
 
-static void MP3_menu_LOGIN_handler(const char key) {
+static void MP3_menu__LOGIN_handler(const char key) {
   if (key >= '0' && key <= '9') {
     if (MP3_menu__LOGIN_get_LOGIN_status() == INCORRECT) {
-      MP3_menu_LOGIN_refresh_passcode();
+      MP3_menu__LOGIN_refresh_passcode();
     }
     uint8_t num = key - 0x30;
     entered_pin = entered_pin * 10 + num;
 
-    delay__ms(200); 
+    delay__ms(200);
 
     lcd__write_string("*", LINE_2, 2 + pin_count, 0);
 
-    if (++pin_count >= 4) {
-      if (entered_pin == passcode)
-        MP3_menu_LOGIN_handle_correct_passcode();
+    if (++pin_count >= LOGIN_number_of_digits) {
+      if (entered_pin == LOGIN_passcode)
+        MP3_menu__LOGIN_handle_correct_passcode();
       else
-        MP3_menu_LOGIN_handle_incorrect_passcode();
+        MP3_menu__LOGIN_handle_incorrect_passcode();
     }
-  } else if (key == 'B') {
-    MP3_menu_LOGIN_refresh_passcode();
+  } else if (key == LOGIN_clear_key) {
+    MP3_menu__LOGIN_refresh_passcode();
   }
 }
 
 LOGIN_stats MP3_menu__LOGIN_get_LOGIN_status(void) { return LOG_stats; }
-//===================================================================
+
+//==================================================================
+//                    M A I N   M E N U
+//==================================================================
+
+uint8_t MAIN_MENU_cur_index = 0;
+string16_t MAIN_MENU_options[2] = {"Setting        ", "Song list      "};
+
+static void MP3_menu__MAIN_MENU_refresh(void) {
+  MAIN_MENU_cur_index = 0;
+  lcd__write_string(">", LINE_2, 0, 0);
+  lcd__write_string("--- MENU ----", LINE_1, 1, 0);
+  lcd__write_string(MAIN_MENU_options[0], LINE_2, 1, 0);
+}
+
+static void MP3_menu__refresh_main_menu(void);
+static void MP3_menu__MAIN_MENU_handle_select_song_list(void) {
+  delay__ms(100);
+  Page_Display = song_list;
+  MP3_menu__refresh_main_menu();
+}
+
+static void MP3_menu__MAIN_MENU_handler(key_press) {
+  if (key_press == ENTER) {
+    if (MAIN_MENU_cur_index) {
+      MP3_menu__MAIN_MENU_handle_select_song_list();
+    }
+  } else if (!MAIN_MENU_cur_index && key_press == SCROLL_DOWN) {
+    MAIN_MENU_cur_index++;
+    lcd__write_string(MAIN_MENU_options[0], LINE_1, 1, 0);
+    lcd__write_string(MAIN_MENU_options[1], LINE_2, 1, 0);
+  } else if (MAIN_MENU_cur_index && key_press == SCROLL_UP)
+    MP3_menu__MAIN_MENU_refresh();
+}
+
+//==================================================================
 
 static void MP3_menu__main_menu_display_top_right(uint8_t INDEX) {
   string16_t display;
@@ -186,15 +257,17 @@ void MP3_menu__UI_handler(const unsigned char key_press) {
   switch (Page_Display) {
   case reboot:
     MP3_menu__LOGIN_lock_menu_page();
-    lcd__write_string(">             ", LINE_2, 0, 0);
-    Page_Display = login;
+    MP3_menu__LOGIN_setup_passcode_UI();
     break;
   case login:
     // vTaskSuspend(xTaskGetHandle("mp3_login")); // Prevent Context Switching
-    MP3_menu_LOGIN_handler(key_press);
+    MP3_menu__LOGIN_handler(key_press);
     // vTaskResume(xTaskGetHandle("mp3_login"));
     break;
-  default:
+  case main_menu:
+    MP3_menu__MAIN_MENU_handler(key_press);
+    break;
+  case song_list:
     if (key_press == '^') {
       MP3_menu__main_menu_scroll_up();
     } else if (key_press == 'V') {
@@ -202,6 +275,8 @@ void MP3_menu__UI_handler(const unsigned char key_press) {
     } else if (key_press == 'E') {
       MP3_menu__song_handler();
     }
+    break;
+  default:
     break;
   }
 }

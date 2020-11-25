@@ -227,7 +227,7 @@ void MP3_task__set_up(void) {
   adc_setup();
   MP3_menu__init();
   MP3_keypad__init();
-  // decoder_test();
+  decoder_test();
   // lcd__test_lcd();
   setvbuf(stdout, 0, _IONBF, 0);
 
