@@ -31,6 +31,8 @@ static void lcd__write_char(uint8_t);
 
 static void lcd__set_4_bitmode(void);
 
+static void lcd__set_cursor_position(LCD_LINE, uint8_t);
+
 /*================================================
  *      P U B L I C   F U N C T I O N S
  *================================================
@@ -84,13 +86,8 @@ void lcd__init() {
   lcd__send_instr_code(DISPLAY_ON_OFF);
 }
 void lcd__write_string(const string16_t STRING, LCD_LINE line, uint8_t ADDRESS_offset, uint16_t DELAY_in_ms) {
-  uint8_t SET_DRAM_ADDRESS_INSTR = (1 << 7);
-  uint8_t FIRST_LINE_START_ADDRESS = 0x00, SECOND_LINE_START_ADDRESS = 0x40;
 
-  uint8_t INSTR_CODE = (line) ? (SET_DRAM_ADDRESS_INSTR | SECOND_LINE_START_ADDRESS)
-                              : (SET_DRAM_ADDRESS_INSTR | FIRST_LINE_START_ADDRESS);
-
-  lcd__send_instr_code(INSTR_CODE + ADDRESS_offset);
+  lcd__set_cursor_position(line, ADDRESS_offset);
 
   /* Note that string16_t has size of 17 b/c 1 extra space is added to accomodate NULL termination
    * Subtract sizeof(string16_t) by 1 would give 16
@@ -163,6 +160,16 @@ static void lcd__set_4_bitmode(void) {
   lcd__transmit_data(FUNCTION_SET);
   delay__us(INSTR_DELAY_in_us);
   lcd__transmit_data(SET_4_BIT_MODE);
+}
+
+static void lcd__set_cursor_position(LCD_LINE line, uint8_t ADDRESS_offset) {
+  uint8_t SET_DRAM_ADDRESS_INSTR = (1 << 7);
+  uint8_t FIRST_LINE_START_ADDRESS = 0x00, SECOND_LINE_START_ADDRESS = 0x40;
+
+  uint8_t INSTR_CODE = (line) ? (SET_DRAM_ADDRESS_INSTR | SECOND_LINE_START_ADDRESS)
+                              : (SET_DRAM_ADDRESS_INSTR | FIRST_LINE_START_ADDRESS);
+
+  lcd__send_instr_code(INSTR_CODE + ADDRESS_offset);
 }
 
 static void config_as_GPIO(void) { // I don't think we need this...

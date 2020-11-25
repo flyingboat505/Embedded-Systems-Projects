@@ -70,9 +70,15 @@ static void MP3_refresh__interrupt(void) { // Refresh it by setting row pins to 
   MP3_keypad_write_row(0b1111);
 }
 
+static TickType_t ticks_to_wait = 0;
+#define ticks_to_wait_to_press 300
+
 static void MP3_keypad__ISR(void) {
-  MP3_keypad_poll();
-  MP3_refresh__interrupt();
+  if (xTaskGetTickCount() - ticks_to_wait > ticks_to_wait_to_press) {
+    ticks_to_wait = xTaskGetTickCount();
+    MP3_keypad_poll();
+    MP3_refresh__interrupt();
+  }
   LPC_GPIOINT->IO0IntClr |= (1 << (keypad_int.pin_number));
 }
 

@@ -1,5 +1,15 @@
 {
     "files.associations": {
-        "cstdlib": "c"
+        "cstdlib": "c",
+        "cstddef": "cpp",
+        "limits": "cpp",
+        "map": "cpp",
+        "set": "cpp",
+        "vector": "cpp",
+        "list": "cpp",
+        "string": "cpp",
+        "new": "cpp",
+        "type_traits": "cpp",
+        "random": "c"
     }
 }

@@ -35,7 +35,7 @@ static void uart_task(void *params);
 int main(void) {
   create_blinky_tasks();
   create_uart_task();
-
+  puts("Starting RTOS");
   MP3_task__set_up();
 
   vTaskStartScheduler(); // Ths function never returns unless RTOS scheduler runs out of memory and fails
