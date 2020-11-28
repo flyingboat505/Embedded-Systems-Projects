@@ -111,6 +111,7 @@ static void mp3_data_player_task(void *p) {
   }
 }
 static SemaphoreHandle_t lcd_write_mutex;
+// This mutex is require otherwise char can be written at some undesirable places
 
 static void mp3_adjust_volume(void *p) {
   uint16_t adc_value;
@@ -118,8 +119,7 @@ static void mp3_adjust_volume(void *p) {
   string16_t volume_display;
 
   while (1) {
-    if (xSemaphoreTake(volume_handler_semaphore, portMAX_DELAY)) {
-      xSemaphoreTake(lcd_write_mutex, portMAX_DELAY);
+    if (xSemaphoreTake(volume_handler_semaphore, portMAX_DELAY) && xSemaphoreTake(lcd_write_mutex, portMAX_DELAY)) {
       adc_value = adc__get_adc_value(ADC__CHANNEL_4);
       volume = (adc_value * 0xFE / 4095);
       MP3_decoder__set_volume(0xFE, volume);
@@ -139,8 +139,7 @@ QueueHandle_t keypad_char_queue;
 static void mp3__interrupt_handler_task(void *p) {
   unsigned char key_press;
   while (1) {
-    if (xQueueReceive(keypad_char_queue, &key_press, portMAX_DELAY)) {
-      xSemaphoreTake(lcd_write_mutex, portMAX_DELAY);
+    if (xQueueReceive(keypad_char_queue, &key_press, portMAX_DELAY) && xSemaphoreTake(lcd_write_mutex, portMAX_DELAY)) {
       MP3_keypad__disable_interrupt();
       // printf("%c\n", key_press);
       MP3_menu__UI_handler(key_press);
@@ -209,7 +208,7 @@ void MP3_task__set_up(void) {
 
   string16_t string = "All";
   uint16_t start_year = 2000, end_year = 2010;
-  MP3_song_payload payload = {string, NULL, NULL};
+  MP3_song_payload payload = {MP3_song_get_genre_options()[1], NULL, NULL};
   MP3_song__query_by_genre_and_year(&payload);
   MP3_song__print_genres();
   MP3_song__print_response();

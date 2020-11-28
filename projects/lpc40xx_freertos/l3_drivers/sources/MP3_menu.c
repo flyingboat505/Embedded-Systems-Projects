@@ -283,14 +283,23 @@ static void MP3_menu__SONG_LIST_reset(void) {
   MP3_menu__SONG_LIST_refresh();
 }
 
-void MP3_menu_SONG_LIST_rotate_string(void) {
-  if (cur_song_cursor_index == -1) {
-    rotate_string(cur_criteria, LEFT);
-    MP3_menu__SONG_LIST_display_top_left(cur_criteria);
-  } else {
-    rotate_string(cur_selected_song, LEFT);
-    MP3_menu__SONG_LIST_display_top_left(cur_selected_song);
+//================== KEYPAD INTEGRATION ========================
+static void MP3_menu__FILTER_refresh(void);
+static void MP3_menu__FILTER_clear_year(void);
+
+static void MP3_menu_SONG_LIST_enter_handler(void) {
+  if (cur_song_cursor_index == select_criteria) {
+    vTaskSuspend(xTaskGetHandle("rotate_str"));
+    Page_Display = filter;
+    MP3_menu__FILTER_refresh();
+    MP3_menu__FILTER_clear_year();
   }
+}
+
+static void MP3_menu_SONG_LIST_return_handler(void) {
+  Page_Display = main_menu;
+  vTaskSuspend(xTaskGetHandle("rotate_str"));
+  MP3_menu__MAIN_MENU_refresh();
 }
 
 static void MP3_menu_SONG_LIST_scroll_down(void) {
@@ -310,7 +319,7 @@ static void MP3_menu_SONG_LIST_scroll_down(void) {
 }
 
 static void MP3_menu_SONG_LIST_scroll_up(void) {
-  if (cur_song_cursor_index-- == 0)
+  if (cur_song_cursor_index-- == 0 || !MP3_song__get_response_size())
     MP3_menu__SONG_LIST_refresh();
   else {
     string64_t next_song = {0};
@@ -328,14 +337,186 @@ static void MP3_menu_SONG_LIST_scroll_up(void) {
 
 static void MP3_menu__SONG_LIST_handler(const char key) {
   if (key == ENTER) {
-
-  } else if (key == SCROLL_UP) {
+    MP3_menu_SONG_LIST_enter_handler();
+  } else if (key == RETURN)
+    MP3_menu_SONG_LIST_return_handler();
+  else if (key == SCROLL_UP) {
     MP3_menu_SONG_LIST_scroll_up();
   } else if (key == SCROLL_DOWN) {
     MP3_menu_SONG_LIST_scroll_down();
   }
 }
 
+//==================================================================
+//                      F I L T E R
+//==================================================================
+#define FILTER_genre 0
+#define FILTER_year 1
+#define FILTER_submit 2
+static uint8_t FILTER_cursor;
+
+//==========GENRE================
+static uint8_t FILTER_cur_genre_option = 0;
+static const string16_t *FILTER_genre_options;
+static bool FILTER_is_genre_option_change;
+
+static void MP3_menu__FILTER_display_genre_text(const char *display_input) {
+  lcd__write_string("               ", LINE_2, 1, 0);
+  string16_t display = {0};
+  snprintf(display, 14, "%s", display_input);
+  lcd__write_string(display, LINE_2, 1, 0);
+}
+
+//==========YEAR=================
+#define FILTER_start_year_cursor 0
+#define FILTER_end_year_cursor 1
+static uint16_t FILTER_start_year = 0;
+static uint16_t FILTER_end_year = 0;
+static uint16_t FILTER_year_cursor;
+
+static void MP3_menu__FILTER_display_year_text(uint16_t start_input_year, uint16_t end_input_year) {
+  string16_t display_start_year = {0};
+  string16_t display_end_year = {0};
+  lcd__write_string("     -          ", LINE_2, 1, 0);
+  if (start_input_year)
+    sprintf(display_start_year, "%d", start_input_year);
+  if (end_input_year)
+    sprintf(display_end_year, "%d", end_input_year);
+  lcd__write_string(display_start_year, LINE_2, 1, 0);
+  lcd__write_string(display_end_year, LINE_2, 6 + 3, 0);
+}
+
+static void MP3_menu__FILTER_year_move_cursor_to_left(void) {
+  lcd__write_string("}", LINE_2, 0, 0);
+  lcd__write_string(" ", LINE_2, 8, 0);
+}
+static void MP3_menu__FILTER_year_move_cursor_to_right(void) {
+  lcd__write_string(" ", LINE_2, 0, 0);
+  lcd__write_string("}", LINE_2, 8, 0);
+}
+
+static void MP3_menu__FILTER_clear_year(void) { FILTER_start_year = FILTER_end_year = 0; }
+
+//================== KEYPAD INTEGRATION ========================
+static void MP3_menu__FILTER_input_number_handler(const char key) {
+  if (FILTER_cursor == FILTER_year) {
+    uint8_t input_number = key - 0x30;
+    if (FILTER_year_cursor == FILTER_start_year_cursor) {
+      FILTER_start_year = FILTER_start_year * 10 + input_number;
+      if (FILTER_start_year > 9999)
+        FILTER_start_year = input_number;
+      MP3_menu__FILTER_display_year_text(FILTER_start_year, FILTER_end_year);
+      MP3_menu__FILTER_year_move_cursor_to_left();
+    } else {
+      FILTER_end_year = FILTER_end_year * 10 + input_number;
+      if (FILTER_end_year > 9999)
+        FILTER_end_year = input_number;
+      MP3_menu__FILTER_display_year_text(FILTER_start_year, FILTER_end_year);
+      MP3_menu__FILTER_year_move_cursor_to_right();
+    }
+  }
+}
+
+static void MP3_menu__FILTER_scroll_left(void) {
+  if (FILTER_cursor == FILTER_genre) {
+    if (FILTER_cur_genre_option-- == 0)
+      FILTER_cur_genre_option = MP3_song__get_num_of_genre_options() - 1;
+    MP3_menu__FILTER_display_genre_text(FILTER_genre_options[FILTER_cur_genre_option]);
+    FILTER_is_genre_option_change = true;
+  } else if (FILTER_cursor == FILTER_year) {
+    if (FILTER_year_cursor == FILTER_end_year_cursor) {
+      FILTER_year_cursor = FILTER_start_year_cursor;
+      MP3_menu__FILTER_year_move_cursor_to_left();
+    }
+  }
+}
+
+static void MP3_menu_FILTER_scroll_right(void) {
+  if (FILTER_cursor == FILTER_genre) {
+    if (FILTER_cur_genre_option++ >= MP3_song__get_num_of_genre_options() - 1)
+      FILTER_cur_genre_option = 0;
+    MP3_menu__FILTER_display_genre_text(FILTER_genre_options[FILTER_cur_genre_option]);
+    FILTER_is_genre_option_change = true;
+  } else if (FILTER_cursor == FILTER_year) {
+    if (FILTER_year_cursor == FILTER_start_year_cursor) {
+      FILTER_year_cursor = FILTER_end_year_cursor;
+      MP3_menu__FILTER_year_move_cursor_to_right();
+    }
+  }
+}
+
+static void MP3_menu_FILTER_at_genre(void);
+static void MP3_menu_FILTER_at_year(void);
+static void MP3_menu_FILTER_at_submit(void);
+
+static void MP3_menu_FILTER_scroll_up(void) {
+  if (FILTER_cursor == FILTER_year)
+    MP3_menu_FILTER_at_genre();
+  else if (FILTER_cursor == FILTER_submit)
+    MP3_menu_FILTER_at_year();
+}
+
+static void MP3_menu_FILTER_scroll_down(void) {
+  if (FILTER_cursor == FILTER_genre)
+    MP3_menu_FILTER_at_year();
+  else if (FILTER_cursor == FILTER_year)
+    MP3_menu_FILTER_at_submit();
+}
+//====================================================================================
+
+static void MP3_menu_FILTER_at_submit(void) {
+  FILTER_cursor = FILTER_submit;
+  lcd__write_string("                ", LINE_1, 0, 0);
+  lcd__write_string("}SUBMIT         ", LINE_2, 0, 0);
+  lcd__write_string("^", LINE_1, 15, 0);
+}
+
+static void MP3_menu_FILTER_at_year(void) {
+  FILTER_cursor = FILTER_year;
+  FILTER_year_cursor = FILTER_start_year_cursor;
+  lcd__write_string(" YEAR             ", LINE_1, 0, 0);
+  lcd__write_string("}", LINE_2, 0, 0);
+  MP3_menu__FILTER_display_year_text(FILTER_start_year, FILTER_end_year);
+  lcd__write_string("^", LINE_1, 15, 0);
+  lcd__write_string("V", LINE_2, 15, 0);
+}
+
+static void MP3_menu_FILTER_at_genre(void) {
+  FILTER_cursor = FILTER_genre;
+  lcd__write_string(" GENRE            ", LINE_1, 0, 0);
+  lcd__write_string("}", LINE_2, 0, 0);
+  if (FILTER_is_genre_option_change) {
+    MP3_menu__FILTER_display_genre_text(FILTER_genre_options[FILTER_cur_genre_option]);
+  } else {
+    string16_t display_genre = {0};
+    sprintf(display_genre, "%s", request_payload.genre);
+    MP3_menu__FILTER_display_genre_text(display_genre);
+  }
+  lcd__write_string("V", LINE_2, 15, 0);
+}
+static void MP3_menu__FILTER_refresh(void) {
+  FILTER_is_genre_option_change = false;
+  FILTER_genre_options = MP3_song_get_genre_options();
+  uint16_t FILTER_start_year = (request_payload.start_year == NULL) ? 0 : *request_payload.start_year;
+  uint16_t FILTER_end_year = (request_payload.end_year == NULL) ? 0 : *request_payload.end_year;
+  MP3_menu_FILTER_at_genre();
+}
+
+static void MP3_menu__FILTER_handler(const char key) {
+  if (key == ENTER) {
+
+  } else if (key >= '0' && key <= '9') {
+    MP3_menu__FILTER_input_number_handler(key);
+  } else if (key == SCROLL_LEFT) {
+    MP3_menu__FILTER_scroll_left();
+  } else if (key == SCROLL_RIGHT) {
+    MP3_menu_FILTER_scroll_right();
+  } else if (key == SCROLL_UP) {
+    MP3_menu_FILTER_scroll_up();
+  } else if (key == SCROLL_DOWN) {
+    MP3_menu_FILTER_scroll_down();
+  }
+}
 /*
 static void MP3_menu__main_menu_display_top_right(uint8_t INDEX) {
   string16_t display;
@@ -431,6 +612,24 @@ static void MP3_menu__song_handler(void) {
   }
 }*/
 
+void MP3_menu_SONG_LIST_rotate_string(void) {
+  switch (Page_Display) {
+  case song_list:
+    if (cur_song_cursor_index == -1) {
+      rotate_string(cur_criteria, LEFT);
+      MP3_menu__SONG_LIST_display_top_left(cur_criteria);
+    } else {
+      rotate_string(cur_selected_song, LEFT);
+      MP3_menu__SONG_LIST_display_top_left(cur_selected_song);
+    }
+    break;
+  case filter:
+    break;
+  default:
+    break;
+  }
+}
+
 extern QueueHandle_t song_name_queue;
 void MP3_menu__UI_handler(const unsigned char key_press) {
   switch (Page_Display) {
@@ -457,6 +656,9 @@ void MP3_menu__UI_handler(const unsigned char key_press) {
       } else if (key_press == 'E') {
         MP3_menu__song_handler();
       }*/
+    break;
+  case filter:
+    MP3_menu__FILTER_handler(key_press);
     break;
   default:
     break;

@@ -58,8 +58,10 @@ void MP3_song__init(void) {
       // Will deal with this....
       // f_puts(song_list[song_size++].file_name, &file_out);
       uint32_t last_index = strlen(song_buffer) - 1;
-      if (song_buffer[last_index] == '\n')
+      if (song_buffer[last_index] == '\n') {
         song_buffer[last_index] = '\0';
+        song_buffer[last_index - 1] = '\0';
+      }
       song_list[song_size] = MP3_song__set_song(song_buffer);
       MP3_song__append_new_genre(song_list[song_size++].genre);
     }
@@ -93,11 +95,12 @@ SONGS MP3_song__search_by_index(uint8_t key) {
 
 //============Genre Options===================
 static void MP3_song__append_new_genre(const char *genre) {
+  memset(genre_option[num_of_genre], 0, sizeof(string16_t));
   for (size_t INDEX = 0; INDEX < num_of_genre; INDEX++) {
     if (strncmp(genre, genre_option[INDEX], sizeof(string16_t) - 1) == strncmp_equal)
       return;
   }
-  strncpy(genre_option[num_of_genre++], genre, sizeof(string16_t) - 1);
+  strncpy(genre_option[num_of_genre++], genre, strlen(genre));
 }
 
 const string16_t *MP3_song_get_genre_options(void) { return genre_option; }
@@ -109,10 +112,10 @@ static MP3_song_list response_song_list;
 static size_t song_reponse_size;
 
 const SONGS *MP3_song__query_by_genre_and_year(MP3_song_payload *payload) {
-  song_reponse_size = 0;
   bool valid_criteria =
       payload->end_year == NULL || payload->end_year == NULL || !(*payload->end_year < *payload->start_year);
   if (valid_criteria) {
+    song_reponse_size = 0;
     for (size_t INDEX = 0; INDEX < song_size; INDEX++) {
       bool genre_valid = ((0 == strncmp(payload->genre, "All", strlen(payload->genre))) ||
                           (0 == strncmp(song_list[INDEX].genre, payload->genre, strlen(payload->genre))));
@@ -141,7 +144,7 @@ void MP3_song__print(void) {
 }
 void MP3_song__print_genres(void) {
   for (size_t INDEX = 0; INDEX < num_of_genre; INDEX++) {
-    printf(" %s\n", genre_option[INDEX]);
+    printf(" %s|\n", genre_option[INDEX]);
   }
 }
 
