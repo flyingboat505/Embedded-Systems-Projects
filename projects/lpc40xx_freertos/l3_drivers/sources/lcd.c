@@ -134,9 +134,9 @@ static void lcd__send_instr_code(uint8_t INSTR_CODE) {
 }
 
 static void replace_lessthan_greaterthan_to_arrow(uint8_t *CHAR) {
-  if (*CHAR == '<')
+  if (*CHAR == '{')
     *CHAR = leftArrow;
-  else if (*CHAR == '>')
+  else if (*CHAR == '}')
     *CHAR = rightArrow;
 }
 

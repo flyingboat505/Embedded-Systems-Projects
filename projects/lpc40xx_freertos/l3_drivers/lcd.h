@@ -1,15 +1,9 @@
 #pragma once
 
 #include "gpio.h"
+#include "string_t.h"
 #include <stdbool.h>
 #include <stdint.h>
-
-typedef char string16_t[16 + 1]; // Accommodate 1 space for NULL termination
-
-//========If you wish to have a string more than 16 chars====================
-typedef char string32_t[32 + 1];
-typedef char string48_t[48 + 1];
-typedef char string64_t[64 + 1];
 
 void lcd__init(void);
 

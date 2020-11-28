@@ -10,6 +10,7 @@
         "string": "cpp",
         "new": "cpp",
         "type_traits": "cpp",
-        "random": "c"
+        "random": "c",
+        "xiosbase": "c"
     }
 }

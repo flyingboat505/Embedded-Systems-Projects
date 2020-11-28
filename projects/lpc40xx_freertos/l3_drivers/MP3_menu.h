@@ -15,9 +15,7 @@ typedef enum {
 } UI_Page;
 
 void MP3_menu__init(void);
-
 void MP3_menu__UI_handler(const unsigned char);
-
 uint8_t MP3_menu__get_cur_song_index(void);
 
 //=================================================

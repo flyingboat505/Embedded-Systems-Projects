@@ -90,18 +90,42 @@ static void configure_pin_as_GPIO(void) {
   gpio__set_function(keypad_int, 0);
 }
 
+/*
+IMPORTANT CONCEPT TO NOTE
+  There are a case when two GPIO push pull output are connected to each other.
+   If this occur, transistor can be damaged.
+
+  This case can be replicated by having two or more button are pressed simultaneously at the same column and different
+row
+
+  Reference https://blog.pepperl-fuchs.us/blog/bid/318384/industrial-sensors-understanding-the-push-pull-output
+
+  Theoretical solution is to use open drain pins and pull up resistor b/c it disable push (high) driven transistor.
+*/
+static void configure_pin_as_open_drain(void) {
+  LPC_IOCON->P2_0 |= (1 << 10);
+  LPC_IOCON->P2_2 |= (1 << 10);
+  LPC_IOCON->P2_5 |= (1 << 10);
+  LPC_IOCON->P2_7 |= (1 << 10);
+}
 void MP3_keypad__enable_interrupt(void) { LPC_GPIOINT->IO0IntEnR |= (1 << (keypad_int.pin_number)); }
 
 void MP3_keypad__disable_interrupt(void) { LPC_GPIOINT->IO0IntEnR &= ~(1 << (keypad_int.pin_number)); }
 
 void MP3_keypad__init(void) {
   configure_pin_as_GPIO();
+  configure_pin_as_open_drain();
   for (size_t INDEX = 0; INDEX < keypad_size; INDEX++) {
     gpio__set_as_output(keypad_row[INDEX]);
     gpio__set_as_input(keypad_col[INDEX]);
   }
   gpio__set_as_input(keypad_int);
   MP3_refresh__interrupt();
+
+  printf("Pin 2.0 IOCON: %08X\n", LPC_IOCON->P2_0);
+  printf("Pin 2.2 IOCON: %08X\n", LPC_IOCON->P2_2);
+  printf("Pin 2.5 IOCON: %08X\n", LPC_IOCON->P2_5);
+  printf("Pin 2.7 IOCON: %08X\n", LPC_IOCON->P2_7);
 
   lpc_peripheral__enable_interrupt(LPC_PERIPHERAL__GPIO, MP3_keypad__ISR, "Keypad_Interrupt");
   MP3_keypad__enable_interrupt();

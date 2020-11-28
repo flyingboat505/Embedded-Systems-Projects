@@ -55,9 +55,9 @@ static void read_file(const char *filename) {
     printf("FILE OPENED: file size: %i\n", f_size(&file));
     songdata_t buffer = {0}; // zero initialize
     UINT bytes_read = 0;
-    uint8_t song_play_index = MP3_menu__get_cur_song_index();
+    // uint8_t song_play_index = MP3_menu__get_cur_song_index();
     isfinish = false;
-    while (!f_eof(&file) && song_play_index == MP3_menu__get_cur_song_index()) {
+    while (!f_eof(&file) /*&& song_play_index == MP3_menu__get_cur_song_index()*/) {
       if (FR_OK == f_read(&file, buffer, sizeof(buffer) - 1, &bytes_read)) {
         // printf("Block size: %i\n", bytes_read);
         xQueueSend(song_data_queue, buffer, portMAX_DELAY);
@@ -110,6 +110,7 @@ static void mp3_data_player_task(void *p) {
     xSemaphoreGive(volume_handler_semaphore);
   }
 }
+static SemaphoreHandle_t lcd_write_mutex;
 
 static void mp3_adjust_volume(void *p) {
   uint16_t adc_value;
@@ -118,6 +119,7 @@ static void mp3_adjust_volume(void *p) {
 
   while (1) {
     if (xSemaphoreTake(volume_handler_semaphore, portMAX_DELAY)) {
+      xSemaphoreTake(lcd_write_mutex, portMAX_DELAY);
       adc_value = adc__get_adc_value(ADC__CHANNEL_4);
       volume = (adc_value * 0xFE / 4095);
       MP3_decoder__set_volume(0xFE, volume);
@@ -127,6 +129,7 @@ static void mp3_adjust_volume(void *p) {
       else
         sprintf(volume_display, "%d", volume);
       lcd__write_string(volume_display, LINE_2, 14, 0);
+      xSemaphoreGive(lcd_write_mutex);
     }
   }
 }
@@ -137,55 +140,29 @@ static void mp3__interrupt_handler_task(void *p) {
   unsigned char key_press;
   while (1) {
     if (xQueueReceive(keypad_char_queue, &key_press, portMAX_DELAY)) {
+      xSemaphoreTake(lcd_write_mutex, portMAX_DELAY);
       MP3_keypad__disable_interrupt();
       // printf("%c\n", key_press);
       MP3_menu__UI_handler(key_press);
+      xSemaphoreGive(lcd_write_mutex);
     }
     MP3_keypad__enable_interrupt();
   }
 }
 
-//========================== L O G I N ======================================
-typedef enum { LEFT = 0, RIGHT } rotate_DIR;
-
-static void rotate_string_left(char *STRING) {
-  char first_char = STRING[0];
-  size_t INDEX;
-  for (INDEX = 0; STRING[INDEX + 1] != '\0'; INDEX++) {
-    STRING[INDEX] = STRING[INDEX + 1];
+static void mp3__rotate_string(void *p) {
+  while (MP3_menu__LOGIN_get_LOGIN_status() != SUCCESS) {
+    vTaskDelay(100);
   }
-  STRING[INDEX] = first_char;
-}
-
-static void rotate_string_right(char *STRING) { // Might not need right rotation
-  char temp_char[2] = {0};
-  uint8_t temp_char_index = 0;
-  size_t INDEX = 0;
-  temp_char[temp_char_index] = STRING[INDEX];
-  temp_char_index = (temp_char_index + 1) % 2;
   while (1) {
-    temp_char[temp_char_index] = STRING[INDEX];
-    temp_char_index = (temp_char_index + 1) % 2;
-    if (STRING[INDEX + 1] == '\0') {
-      STRING[0] = temp_char[temp_char_index];
-      break;
-    }
-    STRING[++INDEX] = temp_char[temp_char_index];
+    xSemaphoreTake(lcd_write_mutex, portMAX_DELAY);
+    MP3_menu_SONG_LIST_rotate_string();
+    xSemaphoreGive(lcd_write_mutex);
+    vTaskDelay(300);
   }
 }
 
-static void rotate_string(char *STRING, rotate_DIR dir) {
-  switch (dir) {
-  case LEFT:
-    rotate_string_left(STRING);
-    break;
-  case RIGHT:
-    rotate_string_right(STRING);
-    break;
-  default:
-    break;
-  }
-}
+//========================== L O G I N ======================================
 
 static void mp3__menu_login(void *p) {
   string48_t login_message = "PLEASE ENTER 4-DIGIT PIN NUMBER     ";
@@ -211,7 +188,7 @@ void decoder_test(void) {
   MP3_decoder__init();
   MP3_decoder__set_volume(0x77, 0x77);
   printf("Testing Decoder...\n");
-  uint8_t n = 0;
+  // uint8_t n = 0;
   // while (1) {
   printf("0x%04X\n", sci_read(0xB));
   MP3_decoder__sine_test(126, 3000);
@@ -222,24 +199,40 @@ static void test_pop_file(void) {
   MP3_song__init();
   MP3_song__print();
 }
-
 void MP3_task__set_up(void) {
   adc_setup();
   MP3_menu__init();
   MP3_keypad__init();
+  MP3_song__print();
   decoder_test();
-  // lcd__test_lcd();
+  puts("");
+
+  string16_t string = "All";
+  uint16_t start_year = 2000, end_year = 2010;
+  MP3_song_payload payload = {string, NULL, NULL};
+  MP3_song__query_by_genre_and_year(&payload);
+  MP3_song__print_genres();
+  MP3_song__print_response();
+  // printf("%i\n", MP3_song__get_response_size());
+  // MP3_song__print_query_result();
   setvbuf(stdout, 0, _IONBF, 0);
 
+  //========== Queue ==========
   song_name_queue = xQueueCreate(1, sizeof(songname_t));
   song_data_queue = xQueueCreate(2, sizeof(songdata_t));
   keypad_char_queue = xQueueCreate(1, sizeof(char));
+  //========== Semaphore ======
   volume_handler_semaphore = xSemaphoreCreateBinary();
+
+  //========== Mutex ==========
+  lcd_write_mutex = xSemaphoreCreateMutex();
+
   pause = 0;
   // xTaskCreate(cli_sim_task, "cli", 1024, NULL, 1, NULL);
   xTaskCreate(mp3_file_reader_task, "reader", 2048 / sizeof(void *), NULL, 1, NULL);
   xTaskCreate(mp3_data_player_task, "player", 2048 / sizeof(void *), NULL, 2, NULL);
-  xTaskCreate(mp3_adjust_volume, "volume", 1024 / sizeof(void *), NULL, 2, NULL);
-  xTaskCreate(mp3__interrupt_handler_task, "mp3_interrupt", 1024 / sizeof(void *), NULL, 3, NULL);
+  xTaskCreate(mp3_adjust_volume, "volume", 1024 / sizeof(void *), NULL, 3, NULL);
+  xTaskCreate(mp3__interrupt_handler_task, "mp3_interrupt", 4096 / sizeof(void *), NULL, 3, NULL);
   xTaskCreate(mp3__menu_login, "mp3_login", 1024 / sizeof(void *), NULL, 2, NULL);
+  xTaskCreate(mp3__rotate_string, "rotate_str", 2048 / sizeof(void *), NULL, 3, NULL);
 }
