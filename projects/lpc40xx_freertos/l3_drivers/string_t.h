@@ -7,6 +7,7 @@ typedef char string32_t[32 + 1];
 typedef char string48_t[48 + 1];
 typedef char string64_t[64 + 1];
 typedef char string128_t[128 + 1];
+typedef char string192_t[192 + 1];
 
 typedef enum { LEFT = 0, RIGHT } rotate_DIR;
 

@@ -16,7 +16,7 @@ static SONGS MP3_song__set_song(const char *song_buffer) {
   SONGS SONG_SET = {0};
   size_t INDEX = 0;
   uint8_t count = 0;
-  SONG_SET.id = song_size;
+  SONG_SET.id = song_size + 1;
   while (song_buffer[INDEX] != '\0') {
     if (song_buffer[INDEX] == '|') {
       count++;

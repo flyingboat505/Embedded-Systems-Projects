@@ -76,7 +76,7 @@ static void cli__task_list_print(sl_string_t output_string, app_cli__print_strin
 //=======================================
 #include "queue.h"
 extern QueueHandle_t song_name_queue; // We should change this...
-extern uint8_t pause;                 // We could use a pause flag appoarch as alternative
+// extern uint8_t pause;                 // We could use a pause flag appoarch as alternative
 
 static void cli__mp3_play(sl_string_t filename, app_cli__print_string_function cli_output) {
   cli_output(NULL, "SENDING songname file: ");
@@ -91,14 +91,14 @@ static void cli__mp3_play(sl_string_t filename, app_cli__print_string_function c
 
 static void cli__mp3_pause(app_cli__print_string_function cli_output) {
   cli_output(NULL, "PAUSING song\n");
-  pause = 1;
+  // pause = 1;
   // TaskHandle_t player_task = xTaskGetHandle("player");
   // vTaskSuspend(player_task);
 }
 
 static void cli__mp3_resume(app_cli__print_string_function cli_output) {
   cli_output(NULL, "Resuming song\n");
-  pause = 0;
+  // pause = 0;
   // TaskHandle_t player_task = xTaskGetHandle("player");
   // vTaskResume(player_task);
 }
