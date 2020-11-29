@@ -40,6 +40,9 @@
 QueueHandle_t song_name_queue;
 static QueueHandle_t song_data_queue;
 
+static SemaphoreHandle_t lcd_write_mutex;
+// This mutex is require otherwise char can be written at some undesirable places
+
 // typedef enum { switch__off, switch__on } switch_e;
 typedef char songname_t[32 + 1];
 typedef char songdata_t[512];
@@ -59,9 +62,17 @@ static void read_file(const char *filename) {
       } else
         puts("ERROR: Failed to read file");
       // memset(&buffer[0], 0, sizeof(buffer)); // Write NULLs to all 256 bytes
+      while (MP3_menu__get_pause()) {
+        vTaskDelay(1);
+      }
     }
+    MP3_keypad__disable_interrupt();
+    xSemaphoreTake(lcd_write_mutex, portMAX_DELAY);
     f_close(&file);
     MP3_menu__finish_song_handler();
+    xQueueReset(song_data_queue);
+    xSemaphoreGive(lcd_write_mutex);
+    MP3_keypad__enable_interrupt();
   }
 }
 
@@ -92,14 +103,9 @@ static void mp3_data_player_task(void *p) {
     if (xQueueReceive(song_data_queue, &songdata[0], portMAX_DELAY)) {
       mp3_decoder_send_block(songdata);
     }
-    while (MP3_menu__get_pause()) {
-      vTaskDelay(1);
-    }
     xSemaphoreGive(volume_handler_semaphore);
   }
 }
-static SemaphoreHandle_t lcd_write_mutex;
-// This mutex is require otherwise char can be written at some undesirable places
 
 static void mp3_adjust_volume(void *p) {
   uint16_t adc_value;
@@ -139,7 +145,7 @@ static void mp3__interrupt_handler_task(void *p) {
 }
 
 static volatile bool suspend_rotate = false;
-void suspend_rotate_task(void) { suspend_rotate = true; }
+void suspend_rotate_task(void) { suspend_rotate = true; } // Need this function to prevent possible deadlock
 
 static void mp3__rotate_string(void *p) {
   while (MP3_menu__LOGIN_get_LOGIN_status() != SUCCESS) {
@@ -209,8 +215,7 @@ void MP3_task__set_up(void) {
   MP3_song__query_by_genre_and_year(&payload);
   MP3_song__print_genres();
   MP3_song__print_response();
-  // printf("%i\n", MP3_song__get_response_size());
-  // MP3_song__print_query_result();
+
   setvbuf(stdout, 0, _IONBF, 0);
 
   //========== Queue ==========

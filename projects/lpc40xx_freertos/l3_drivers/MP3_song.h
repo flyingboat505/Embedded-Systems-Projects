@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#define MP3_song_search_invalid -1
+
 typedef struct {
   uint8_t id;
   string32_t file_name;
@@ -41,6 +43,7 @@ typedef struct {
   uint16_t *end_year;
 } MP3_song_payload;
 
+int8_t MP3_song__search_song_response_by_id(uint8_t id);
 const SONGS *MP3_song__query_by_genre_and_year(MP3_song_payload *);
 uint8_t MP3_song__get_response_size(void);
 

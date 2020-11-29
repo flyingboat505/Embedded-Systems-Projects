@@ -71,21 +71,6 @@ void MP3_song__init(void) {
   puts("\n");
 }
 
-/*
-uint8_t MP3_song__get_index(void) { return cur_song_index; }
-
-void MP3_song__next(void) {
-  cur_song_index++;
-  // display song name into LCD
-}
-
-void MP3_song__prev(void) {
-  cur_song_index--;
-  // display song name into LCD
-}
-
-void MP3_song__set_index(uint8_t index) { cur_song_index = index; }*/
-
 uint8_t MP3_song__get_overall_size(void) { return song_size; }
 /*
 SONGS MP3_song__search_by_index(uint8_t key) {
@@ -110,6 +95,15 @@ uint8_t MP3_song__get_num_of_genre_options(void) { return num_of_genre; }
 
 static MP3_song_list response_song_list;
 static size_t song_reponse_size;
+
+int8_t MP3_song__search_song_response_by_id(uint8_t id) {
+  uint8_t INDEX;
+  for (INDEX = 0; INDEX < song_reponse_size; INDEX++) {
+    if (id == response_song_list[INDEX].id)
+      return INDEX;
+  }
+  return MP3_song_search_invalid;
+}
 
 const SONGS *MP3_song__query_by_genre_and_year(MP3_song_payload *payload) {
   bool valid_criteria =

@@ -17,7 +17,10 @@ void suspend_rotate_task(void);
 static void Redirect_to_reboot_code();
 static void Redirect_to_login_code();
 static void Redirect_to_main_menu_code();
+static void Redirect_to_setting_code();
 static void Redirect_to_song_list_code();
+static void Redirect_to_song_info_code();
+static void Redirect_to_filter_code();
 
 //==================================================================
 
@@ -189,6 +192,9 @@ static void MP3_menu__MAIN_MENU_handler(key_press) {
 //==================================================================
 //                      S E T T I N G
 //==================================================================
+static void Redirect_to_setting_code() {}
+//-----------------------------------
+
 #define SETTING_playback 0
 #define SETTING_autoplay 1
 static bool enable_playback = false;
@@ -454,6 +460,9 @@ static void MP3_menu__SONG_LIST_handler(const char key) {
 //==================================================================
 //                   S O N G   I N F O
 //==================================================================
+static void Redirect_to_song_info_code() {}
+//-----------------------------------
+
 static string192_t SONG_INFO_select_song_display = {0};
 static void MP3_menu__SONG_INFO_set_display(SONGS SONG) {
   snprintf(SONG_INFO_select_song_display, sizeof(string192_t) - 1, "%s - %s - %s - %d - %s    ", SONG.song_name,
@@ -462,7 +471,7 @@ static void MP3_menu__SONG_INFO_set_display(SONGS SONG) {
 
 static void MP3__menu__SONG_INFO_print_status(SONGS SONG) {
   cur_select_song_id = SONG.id;
-  lcd__write_string("            ", LINE_2, 0, 0);
+  lcd__write_string("}           ", LINE_2, 0, 0);
   if (cur_playing_song.id == SONG.id) {
     lcd__write_string(" P", LINE_1, 14, 0);
     if (MP3_menu__get_pause())
@@ -504,6 +513,8 @@ static void MP3_menu__SONG_INFO_play_song(const char *filename) { xQueueSend(son
 static void MP3_menu__SONG_INFO_press_enter_handler(void) {
   if (!SONG_INFO_at_no_play_song_page) {
     if (!cur_playing_song.id || cur_select_song_id != cur_playing_song.id) {
+      if (MP3_menu__get_pause())
+        MP3_menu__pause();
       cur_playing_song = SONG_LIST[cur_song_cursor_index];
       MP3_menu__SONG_INFO_play_song(cur_playing_song.file_name);
     } else {
@@ -523,7 +534,6 @@ static void MP3_menu__SONG_INFO_handler(key_press) {
   } else if (key_press == '0') {
     if (!MP3_menu__get_pause() && cur_select_song_id && cur_select_song_id == cur_playing_song.id) {
       MP3_menu__stop();
-      lcd__write_string("Stopped    ", LINE_2, 1, 0);
     }
   }
 }
@@ -531,6 +541,9 @@ static void MP3_menu__SONG_INFO_handler(key_press) {
 //==================================================================
 //                      F I L T E R
 //==================================================================
+static void Redirect_to_filter_code() {}
+//-----------------------------------
+
 #define FILTER_genre 0
 #define FILTER_year 1
 #define FILTER_submit 2
@@ -773,12 +786,51 @@ void MP3_menu_SONG_LIST_rotate_string(void) {
 
 void MP3_menu__finish_song_handler(void) {
   string32_t DONT_USE;
+  bool at_cur_song_page = (cur_select_song_id && cur_playing_song.id == cur_select_song_id);
+
+  // Checks if other song is requested to play
   if (!xQueuePeek(song_name_queue, DONT_USE, 0)) {
+
     if (enable_playback && !MP3_stop) {
       MP3_menu__SONG_INFO_play_song(cur_playing_song.file_name);
+      if (at_cur_song_page) {
+        lcd__write_string("}Replaying...", LINE_2, 0, 0);
+        vTaskDelay(2000);
+        lcd__write_string("}Playing...  ", LINE_2, 0, 0);
+      }
+    } else if (enable_autoplay && !MP3_stop) {
+      int8_t cur_song_index = MP3_song__search_song_response_by_id(cur_playing_song.id);
+
+      // If response payload has no result, it would do a replay
+      if (MP3_song__get_response_size()) {
+        if (cur_song_index != MP3_song_search_invalid && cur_song_index < MP3_song__get_response_size() - 1) {
+          cur_song_cursor_index = cur_song_index + 1;
+          // cur_playing_song = SONG_LIST[cur_song_index + 1];
+        } else {
+          cur_song_cursor_index = 0;
+        }
+        cur_playing_song = SONG_LIST[cur_song_cursor_index];
+        MP3_menu__SONG_INFO_play_song(cur_playing_song.file_name);
+      } else { // If the playlist is empty
+        cur_playing_song = (SONGS){0};
+      }
+      if (at_cur_song_page) {
+        lcd__write_string("}Next song...", LINE_2, 0, 0);
+        vTaskDelay(2000);
+        MP3_menu__SONG_INFO_open_current_playing_song();
+        if (MP3_song__get_response_size())
+          lcd__write_string("}Playing...  ", LINE_2, 0, 0);
+      }
+
     } else {
+      if (at_cur_song_page) {
+        lcd__write_string("}Stopping...", LINE_2, 0, 0);
+        vTaskDelay(2000);
+        lcd__write_string("}Play        ", LINE_2, 0, 0);
+      }
       cur_playing_song = (SONGS){0};
     }
+
     MP3_stop = false;
   }
 }
