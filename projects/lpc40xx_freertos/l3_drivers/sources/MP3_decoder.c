@@ -33,7 +33,8 @@ static void MP3_decoder__disable_CS(void) { gpio__set(decoder_CS); }
 #define VS1053_REG_MODE 0x0
 #define VS1053_MODE_SM_SDINEW 0x0800
 #define VS1053_MODE_SM_RESET 0x0004
-#define VS1053_REG_VOLUME 0x0B
+#define VS1053_REG_VOLUME 0x0B // pg 31, expression
+#define VS1053_REG_BASS 0x2 // pg 37
 
 static uint16_t MP3_decoder__sci_read(uint8_t address) {
   uint16_t data = 0;

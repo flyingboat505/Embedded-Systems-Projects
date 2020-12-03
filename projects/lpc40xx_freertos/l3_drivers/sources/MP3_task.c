@@ -45,7 +45,7 @@ static SemaphoreHandle_t lcd_write_mutex;
 
 // typedef enum { switch__off, switch__on } switch_e;
 typedef char songname_t[32 + 1];
-typedef char songdata_t[512];
+typedef char songdata_t[1024];
 
 static void read_file(const char *filename) {
   printf("Request received to play/read: '%s'\n", filename);
@@ -111,7 +111,7 @@ static void mp3_adjust_volume(void *p) {
   uint16_t adc_value;
   uint8_t volume;
   string16_t volume_display;
-
+  MP3_decoder__set_volume(0,0);
   while (1) {
     if (xSemaphoreTake(volume_handler_semaphore, portMAX_DELAY) && xSemaphoreTake(lcd_write_mutex, portMAX_DELAY)) {
       adc_value = adc__get_adc_value(ADC__CHANNEL_4);
