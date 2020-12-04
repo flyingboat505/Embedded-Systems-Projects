@@ -35,6 +35,25 @@ static void MP3_decoder__disable_CS(void) { gpio__set(decoder_CS); }
 #define VS1053_MODE_SM_RESET 0x0004
 #define VS1053_REG_VOLUME 0x0B // pg 31, expression
 #define VS1053_REG_BASS 0x2 // pg 37
+#define VS1053_REG_TREMBLE 0x2 // pg 37
+
+          
+void MP3_decoder__set_bass(uint8_t data)
+{
+  // for tremble use ST_AMPLITUDE and uses bits 15:12, Is activated when it is non-zero
+  // for bass use SB_AMPLITUDE and use bits 7:4, set to user's prefernces,
+  // SB_FREQLIMIT should be set 1.5times the lowest frequency the user's audio reproduces
+  uint16_t bass_temp = MP3_decoder__sci_read(VS1053_REG_BASS);
+  bass_temp &= ~(0xF << 4); // to get bits 7:4 to be zeros
+  MP3_decoder__sci_write(VS1053_REG_BASS, bass_temp | (data << 4));
+}
+
+void MP3_decoder__set_tremble(uint8_t data)
+{
+  uint16_t tremble_temp = MP3_decoder__sci_read(VS1053_REG_BASS);
+  tremble_temp &= ~(0xF << 12); // to get bits 15:12 to be zeros
+  MP3_decoder__sci_write(VS1053_REG_TREMBLE, tremble_temp | (data << 12));
+}
 
 static uint16_t MP3_decoder__sci_read(uint8_t address) {
   uint16_t data = 0;

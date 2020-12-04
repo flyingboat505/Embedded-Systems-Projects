@@ -759,6 +759,32 @@ static void MP3_menu__FILTER_handler(const char key) {
   }
 }
 
+// =========VOLUME/BASS/TREMBLE=============
+typedef enum{
+  pot_vol = 0, //states
+  pot_bass,
+  pot_trem
+} POT;
+
+static POT pot_controller;
+
+void MP3_menu__VOL_BASS_TREM_handler(){
+  if(pot_controller == pot_vol)
+  {
+    MP3_decoder__set_volume();
+  }
+  else if (pot_controller == pot_bass)
+  {
+    MP3_decoder__set_bass();
+  }
+  else if (pot_controller == pot_trem)
+  {
+    MP3_decoder___set_tremble();
+  }
+}
+
+// ==========================================
+
 void MP3_menu_SONG_LIST_rotate_string(void) {
   switch (Page_Display) {
   case song_list:

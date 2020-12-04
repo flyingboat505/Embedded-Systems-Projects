@@ -12,3 +12,7 @@ void MP3_decoder__set_volume(uint8_t left, uint8_t right);
 void MP3_decoder__sine_test(uint8_t n, uint16_t delay_in_ms);
 
 uint16_t sci_read(uint8_t address);
+
+void MP3_decoder__set_bass(uint8_t data);
+
+void MP3_decoder__set_tremble(uint8_t data)
