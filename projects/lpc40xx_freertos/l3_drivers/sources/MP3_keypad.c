@@ -16,6 +16,10 @@ static keypad_map MAP = {{'1', '2', '3', 'B'}, {'4', '5', '6', '^'}, {'7', '8', 
 
 extern QueueHandle_t keypad_char_queue;
 
+//=========================================================
+//       K E Y P A D    I S R   F U N C T I O N S
+//=========================================================
+
 static uint8_t MP3_keypad_read_col(void) {
   uint8_t data = 0;
   for (int8_t INDEX = keypad_size - 1; INDEX >= 0; INDEX--) {
@@ -82,6 +86,9 @@ static void MP3_keypad__ISR(void) {
   LPC_GPIOINT->IO0IntClr |= (1 << (keypad_int.pin_number));
 }
 
+//=========================================================
+//             K E Y P A D    I N I T
+//=========================================================
 static void configure_pin_as_GPIO(void) {
   for (size_t INDEX = 0; INDEX < keypad_size; INDEX++) {
     gpio__set_function(keypad_row[INDEX], 0);
@@ -132,9 +139,4 @@ void MP3_keypad__init(void) {
   NVIC_EnableIRQ(GPIO_IRQn);
 
   printf("keypad ready\n");
-  /*
-    while (1) {
-      printf("Col: 0x%01X\n", read_col());
-      delay__ms(500);
-    }*/
 }

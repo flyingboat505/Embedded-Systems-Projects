@@ -760,6 +760,7 @@ static void MP3_menu__FILTER_handler(const char key) {
 }
 
 // =========VOLUME/BASS/TREMBLE=============
+/*
 typedef enum{
   pot_vol = 0, //states
   pot_bass,
@@ -781,7 +782,7 @@ void MP3_menu__VOL_BASS_TREM_handler(){
   {
     MP3_decoder___set_tremble();
   }
-}
+}*/
 
 // ==========================================
 

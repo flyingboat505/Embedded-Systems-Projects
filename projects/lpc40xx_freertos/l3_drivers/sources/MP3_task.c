@@ -111,12 +111,14 @@ static void mp3_adjust_volume(void *p) {
   uint16_t adc_value;
   uint8_t volume;
   string16_t volume_display;
-  MP3_decoder__set_volume(0,0);
+  MP3_decoder__set_volume(35, 35);
   while (1) {
     if (xSemaphoreTake(volume_handler_semaphore, portMAX_DELAY) && xSemaphoreTake(lcd_write_mutex, portMAX_DELAY)) {
       adc_value = adc__get_adc_value(ADC__CHANNEL_4);
-      volume = (adc_value * 0xFE / 4095);
-      MP3_decoder__set_volume(0xFE, volume);
+      volume = (adc_value * 0xF / 4095);
+      // MP3_decoder__set_volume(0xFE, volume);
+      printf("%i\n", volume);
+      MP3_decoder__set_bass(volume);
       /*
       volume = 99 - (volume * 99 / 0xFE);
       if (volume < 10)
@@ -232,7 +234,7 @@ void MP3_task__set_up(void) {
   xTaskCreate(mp3_file_reader_task, "reader", 2500 / sizeof(void *), NULL, 1, NULL);
   xTaskCreate(mp3_data_player_task, "player", 2048 / sizeof(void *), NULL, 2, NULL);
   xTaskCreate(mp3_adjust_volume, "volume", 1024 / sizeof(void *), NULL, 3, NULL);
-  xTaskCreate(mp3__interrupt_handler_task, "mp3_interrupt", 4096 / sizeof(void *), NULL, 3, NULL);
+  xTaskCreate(mp3__interrupt_handler_task, "mp3_interrupt", 2048 / sizeof(void *), NULL, 3, NULL);
   xTaskCreate(mp3__menu_login, "mp3_login", 1024 / sizeof(void *), NULL, 2, NULL);
   xTaskCreate(mp3__rotate_string, "rotate_str", 2048 / sizeof(void *), NULL, 3, NULL);
 }
