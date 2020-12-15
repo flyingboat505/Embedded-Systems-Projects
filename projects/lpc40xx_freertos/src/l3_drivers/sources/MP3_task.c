@@ -87,7 +87,7 @@ static void mp3_file_reader_task(void *p) {
   }
 }
 
-//Here's a test Comment
+// Here's a test Comment
 static void mp3_decoder_send_block(songdata_t data) {
   size_t BYTE_SEND = 32;
   for (size_t index = 0; index < sizeof(songdata_t); index += BYTE_SEND) { // index += 32
@@ -112,7 +112,7 @@ static void mp3_adjust_volume(void *p) {
   uint16_t adc_value;
   uint8_t volume;
   string16_t volume_display;
-  MP3_decoder__set_volume(0,0);
+  MP3_decoder__set_volume(0, 0);
   while (1) {
     if (xSemaphoreTake(volume_handler_semaphore, portMAX_DELAY) && xSemaphoreTake(lcd_write_mutex, portMAX_DELAY)) {
       adc_value = adc__get_adc_value(ADC__CHANNEL_4);
