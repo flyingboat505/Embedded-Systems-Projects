@@ -45,7 +45,7 @@ static SemaphoreHandle_t lcd_write_mutex;
 
 // typedef enum { switch__off, switch__on } switch_e;
 typedef char songname_t[32 + 1];
-typedef char songdata_t[1024];
+typedef char songdata_t[1024 / 2];
 
 static void read_file(const char *filename) {
   printf("Request received to play/read: '%s'\n", filename);
@@ -87,7 +87,7 @@ static void mp3_file_reader_task(void *p) {
   }
 }
 
-//Here's a test Comment
+// Here's a test Comment
 static void mp3_decoder_send_block(songdata_t data) {
   size_t BYTE_SEND = 32;
   for (size_t index = 0; index < sizeof(songdata_t); index += BYTE_SEND) { // index += 32
@@ -112,12 +112,11 @@ static void mp3_adjust_volume(void *p) {
   uint16_t adc_value;
   uint8_t volume;
   string16_t volume_display;
-  MP3_decoder__set_volume(0,0);
+  MP3_decoder__set_volume(0, 0);
   while (1) {
     if (xSemaphoreTake(volume_handler_semaphore, portMAX_DELAY) && xSemaphoreTake(lcd_write_mutex, portMAX_DELAY)) {
       adc_value = adc__get_adc_value(ADC__CHANNEL_4);
-      volume = (adc_value * 0xFE / 4095);
-      MP3_decoder__set_volume(0xFE, volume);
+      MP3_menu__VOL_BASS_TREM_handler(adc_value);
       /*
       volume = 99 - (volume * 99 / 0xFE);
       if (volume < 10)
@@ -137,7 +136,7 @@ static void mp3__interrupt_handler_task(void *p) {
   while (1) {
     if (xQueueReceive(keypad_char_queue, &key_press, portMAX_DELAY) && xSemaphoreTake(lcd_write_mutex, portMAX_DELAY)) {
       MP3_keypad__disable_interrupt();
-      // printf("%c\n", key_press);
+      printf("%c\n", key_press);
       MP3_menu__UI_handler(key_press);
       xSemaphoreGive(lcd_write_mutex);
     }
@@ -195,6 +194,7 @@ void decoder_test(void) {
   // while (1) {
   printf("0x%04X\n", sci_read(0xB));
   MP3_decoder__sine_test(126, 3000);
+  MP3_decoder__set_volume(0, 0);
   delay__ms(500);
 }
 

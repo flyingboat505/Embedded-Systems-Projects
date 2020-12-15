@@ -19,4 +19,6 @@ typedef enum { IN_PROCESS = 0, INCORRECT, SUCCESS } LOGIN_stats;
 
 LOGIN_stats MP3_menu__LOGIN_get_LOGIN_status(void);
 
+void MP3_menu__VOL_BASS_TREM_handler(uint16_t);
+
 void MP3_menu__finish_song_handler(void);

@@ -79,6 +79,7 @@ static TickType_t ticks_to_wait = 0;
 
 static void MP3_keypad__ISR(void) {
   if (xTaskGetTickCount() - ticks_to_wait > ticks_to_wait_to_press) {
+    // fprintf(stderr, "IN ISR\n");
     ticks_to_wait = xTaskGetTickCount();
     MP3_keypad_poll();
     MP3_refresh__interrupt();

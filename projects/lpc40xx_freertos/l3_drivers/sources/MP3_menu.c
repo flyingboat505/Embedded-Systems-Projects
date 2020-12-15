@@ -34,6 +34,14 @@ static void Redirect_to_filter_code();
 #define ENTER 'E'
 #define RETURN 'B'
 
+typedef enum {
+  pot_vol = 1, // states
+  pot_bass,
+  pot_trem
+} POT;
+
+static POT pot_controller = pot_vol;
+
 static void MP3_menu__rebooting_mp3(void);
 
 void MP3_menu__init(void) {
@@ -348,6 +356,12 @@ static void MP3_menu__SONG_LIST_display_top_right(int8_t INDEX) {
   lcd__write_string(display, LINE_1, 14, 0);
 }
 
+static void MP3_menu__SONG_LIST_display_bottom_right(const char *display_input) {
+  string16_t display = {0};
+  strncpy(display, display_input, 2);
+  lcd__write_string(display, LINE_2, 14, 0);
+}
+
 static void MP3_menu__SONG_LIST_display_top_left(const char *display_input) {
   string16_t display = {0};
   strncpy(display, display_input, 12);
@@ -358,7 +372,7 @@ static void MP3_menu__SONG_LIST_display_bottom_left(const char *display_input) {
   strncpy(display, display_input, 12);
   lcd__write_string(display, LINE_2, 1, 0);
 }
-
+static void MP3_menu__SONG_INFO_set_pot_control_handler(uint8_t);
 static void MP3_menu__SONG_LIST_refresh(void) {
   cur_song_cursor_index = -1;
   cur_select_song_id = 0;
@@ -367,6 +381,7 @@ static void MP3_menu__SONG_LIST_refresh(void) {
   lcd__write_string(" ", LINE_2, 0, 0);
   lcd__write_string("|", LINE_1, 13, 0);
   lcd__write_string("|", LINE_2, 13, 0);
+  MP3_menu__SONG_INFO_set_pot_control_handler(pot_controller + 0x30);
   MP3_menu__SONG_LIST_display_top_left(cur_criteria);
   MP3_menu__SONG_LIST_display_top_right(cur_song_cursor_index);
   string64_t song_display = {0};
@@ -525,10 +540,25 @@ static void MP3_menu__SONG_INFO_press_enter_handler(void) {
   }
 }
 
+static void MP3_menu__SONG_INFO_set_pot_control_handler(uint8_t key) {
+  if (key == '1') {
+    pot_controller = pot_vol;
+    MP3_menu__SONG_LIST_display_bottom_right(" V");
+  } else if (key == '2') {
+    pot_controller = pot_bass;
+    MP3_menu__SONG_LIST_display_bottom_right(" B");
+  } else if (key == '3') {
+    pot_controller = pot_trem;
+    MP3_menu__SONG_LIST_display_bottom_right(" T");
+  }
+}
+
 static void MP3_menu__SONG_INFO_handler(key_press) {
   if (key_press == RETURN || key_press == SCROLL_LEFT) {
     MP3_menu__SONG_LIST_refresh();
     Page_Display = song_list;
+  } else if (key_press >= '1' && key_press <= '3') {
+    MP3_menu__SONG_INFO_set_pot_control_handler(key_press);
   } else if (key_press == ENTER) {
     MP3_menu__SONG_INFO_press_enter_handler();
   } else if (key_press == '0') {
@@ -760,29 +790,24 @@ static void MP3_menu__FILTER_handler(const char key) {
 }
 
 // =========VOLUME/BASS/TREMBLE=============
-/*
-typedef enum{
-  pot_vol = 0, //states
-  pot_bass,
-  pot_trem
-} POT;
+#include "MP3_decoder.h"
 
-static POT pot_controller;
-
-void MP3_menu__VOL_BASS_TREM_handler(){
-  if(pot_controller == pot_vol)
-  {
-    MP3_decoder__set_volume();
+void MP3_menu__VOL_BASS_TREM_handler(uint16_t adc_value) {
+  uint16_t data_send = 0;
+  if (pot_controller == pot_vol) {
+    data_send = 4095 - adc_value;
+    data_send = data_send * (0xFF / 2 + 0x20) / 4095;
+    MP3_decoder__set_volume(data_send, data_send);
+  } else if (pot_controller == pot_bass) {
+    data_send = adc_value * (0xF + 1) / 4095;
+    data_send = (data_send == 0xF + 1) ? 0xF : data_send;
+    MP3_decoder__set_bass(data_send);
+  } else if (pot_controller == pot_trem) {
+    data_send = adc_value * (0xF + 1) / 4095;
+    data_send = (data_send == 0xF + 1) ? 0xF : data_send;
+    MP3_decoder__set_tremble(data_send);
   }
-  else if (pot_controller == pot_bass)
-  {
-    MP3_decoder__set_bass();
-  }
-  else if (pot_controller == pot_trem)
-  {
-    MP3_decoder___set_tremble();
-  }
-}*/
+}
 
 // ==========================================
 
