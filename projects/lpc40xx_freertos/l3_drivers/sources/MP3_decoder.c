@@ -96,7 +96,7 @@ void MP3_decoder__init(void) { // Will add pin number in these parameter later..
   gpio__set_as_output(decoder_XDCS);
   gpio__set_as_input(decoder_DREQ);
 
-  ssp2__initialize(1000); // 1khz?
+  ssp2__initialize(1000);
   MP3_decoder__reset();
   MP3_decoder__sci_write(0x02, 0x050F);
 }

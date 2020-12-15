@@ -510,7 +510,7 @@ static void MP3_menu__SONG_INFO_open_current_playing_song(void) {
     SONG_INFO_at_no_play_song_page = true;
     snprintf(SONG_INFO_select_song_display, sizeof(string192_t) - 1,
              "No song is currently playing. Please select a song     ");
-    lcd__write_string("{ Press B", LINE_2, 0, 0);
+    lcd__write_string("{ Press Ret", LINE_2, 0, 0);
   }
 }
 
@@ -791,6 +791,27 @@ static void MP3_menu__FILTER_handler(const char key) {
 
 // =========VOLUME/BASS/TREMBLE=============
 #include "MP3_decoder.h"
+#include "semphr.h"
+extern SemaphoreHandle_t lcd_write_mutex;
+void MP3_menu__VOL_BASS_TREM_adjust_display_handler(uint16_t adc_value, uint16_t *prev_value) {
+  if (Page_Display == song_info || Page_Display == song_list) {
+    xSemaphoreTake(lcd_write_mutex, portMAX_DELAY);
+    if (adc_value < *prev_value && *prev_value - adc_value >= 10) {
+      lcd__write_string("V", LINE_2, 14, 0);
+      *prev_value = adc_value;
+    } else if (adc_value > *prev_value && adc_value - *prev_value >= 10) {
+      lcd__write_string("^", LINE_2, 14, 0);
+      *prev_value = adc_value;
+    }
+    xSemaphoreGive(lcd_write_mutex);
+    vTaskDelay(500);
+    xSemaphoreTake(lcd_write_mutex, portMAX_DELAY);
+    lcd__write_string(" ", LINE_2, 14, 0);
+    xSemaphoreGive(lcd_write_mutex);
+  } else {
+    *prev_value = adc_value;
+  }
+}
 
 void MP3_menu__VOL_BASS_TREM_handler(uint16_t adc_value) {
   uint16_t data_send = 0;

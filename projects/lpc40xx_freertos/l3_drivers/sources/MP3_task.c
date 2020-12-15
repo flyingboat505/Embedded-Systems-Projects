@@ -40,12 +40,12 @@
 QueueHandle_t song_name_queue;
 static QueueHandle_t song_data_queue;
 
-static SemaphoreHandle_t lcd_write_mutex;
+SemaphoreHandle_t lcd_write_mutex;
 // This mutex is require otherwise char can be written at some undesirable places
 
 // typedef enum { switch__off, switch__on } switch_e;
 typedef char songname_t[32 + 1];
-typedef char songdata_t[1024 / 2];
+typedef char songdata_t[1024];
 
 static void read_file(const char *filename) {
   printf("Request received to play/read: '%s'\n", filename);
@@ -109,22 +109,14 @@ static void mp3_data_player_task(void *p) {
 }
 
 static void mp3_adjust_volume(void *p) {
-  uint16_t adc_value;
+  uint16_t adc_value, prev_value = 0;
   uint8_t volume;
-  string16_t volume_display;
   MP3_decoder__set_volume(0, 0);
   while (1) {
-    if (xSemaphoreTake(volume_handler_semaphore, portMAX_DELAY) && xSemaphoreTake(lcd_write_mutex, portMAX_DELAY)) {
+    if (xSemaphoreTake(volume_handler_semaphore, portMAX_DELAY)) {
       adc_value = adc__get_adc_value(ADC__CHANNEL_4);
       MP3_menu__VOL_BASS_TREM_handler(adc_value);
-      /*
-      volume = 99 - (volume * 99 / 0xFE);
-      if (volume < 10)
-        sprintf(volume_display, " %d", volume);
-      else
-        sprintf(volume_display, "%d", volume);
-      lcd__write_string(volume_display, LINE_2, 14, 0);*/
-      xSemaphoreGive(lcd_write_mutex);
+      MP3_menu__VOL_BASS_TREM_adjust_display_handler(adc_value, &prev_value);
     }
   }
 }
@@ -136,7 +128,7 @@ static void mp3__interrupt_handler_task(void *p) {
   while (1) {
     if (xQueueReceive(keypad_char_queue, &key_press, portMAX_DELAY) && xSemaphoreTake(lcd_write_mutex, portMAX_DELAY)) {
       MP3_keypad__disable_interrupt();
-      printf("%c\n", key_press);
+      // printf("%c\n", key_press);
       MP3_menu__UI_handler(key_press);
       xSemaphoreGive(lcd_write_mutex);
     }
