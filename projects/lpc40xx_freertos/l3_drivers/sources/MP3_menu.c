@@ -760,25 +760,20 @@ static void MP3_menu__FILTER_handler(const char key) {
 }
 
 // =========VOLUME/BASS/TREMBLE=============
-typedef enum{
-  pot_vol = 0, //states
+typedef enum {
+  pot_vol = 0, // states
   pot_bass,
   pot_trem
 } POT;
 
 static POT pot_controller;
 
-void MP3_menu__VOL_BASS_TREM_handler(){
-  if(pot_controller == pot_vol)
-  {
+void MP3_menu__VOL_BASS_TREM_handler() {
+  if (pot_controller == pot_vol) {
     MP3_decoder__set_volume();
-  }
-  else if (pot_controller == pot_bass)
-  {
+  } else if (pot_controller == pot_bass) {
     MP3_decoder__set_bass();
-  }
-  else if (pot_controller == pot_trem)
-  {
+  } else if (pot_controller == pot_trem) {
     MP3_decoder___set_tremble();
   }
 }
@@ -810,6 +805,9 @@ void MP3_menu_SONG_LIST_rotate_string(void) {
   }
 }
 
+//================================
+extern volatile SONGS WATCHDOG_current_song;
+//================================
 void MP3_menu__finish_song_handler(void) {
   string32_t DONT_USE;
   bool at_cur_song_page = (cur_select_song_id && cur_playing_song.id == cur_select_song_id);
@@ -836,6 +834,9 @@ void MP3_menu__finish_song_handler(void) {
           cur_song_cursor_index = 0;
         }
         cur_playing_song = SONG_LIST[cur_song_cursor_index];
+
+        WATCHDOG_current_song = cur_playing_song;
+
         MP3_menu__SONG_INFO_play_song(cur_playing_song.file_name);
       } else { // If the playlist is empty
         cur_playing_song = (SONGS){0};
@@ -889,3 +890,31 @@ void MP3_menu__UI_handler(const unsigned char key_press) {
     break;
   }
 }
+
+//====================================================
+// For watchdog task
+bool MP3_menu__WATCHDOG_is_autoplay(void) {
+  return enable_autoplay; // checks autoplay is enable
+}
+bool MP3_menu__WATCHDOG_is_playback(void) {
+  return enable_playback; // checks playback is enable
+}
+
+#define WATCHDOG_enable_autoplay 1
+#define WATCHDOG_enable_playback 0
+
+void MP3_menu__WATCHDOG_override_Page(void) {
+#if WATCHDOG_enable_autoplay
+  enable_autoplay = true;
+#endif
+#if WATCHDOG_enable_playback
+  enable_playback = true;
+#endif
+  request_payload = (MP3_song_payload){"All", NULL, NULL};
+  SONG_LIST = MP3_song__query_by_genre_and_year(&request_payload);
+  cur_playing_song = SONG_LIST[0];
+  WATCHDOG_current_song = cur_playing_song;
+  MP3_menu_SONG_LIST_enter_handler();
+  MP3_menu__SONG_INFO_play_song(cur_playing_song.file_name);
+}
+//====================================================

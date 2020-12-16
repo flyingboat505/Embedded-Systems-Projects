@@ -15,4 +15,4 @@ uint16_t sci_read(uint8_t address);
 
 void MP3_decoder__set_bass(uint8_t data);
 
-void MP3_decoder__set_tremble(uint8_t data)
+void MP3_decoder__set_tremble(uint8_t data);
