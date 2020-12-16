@@ -45,7 +45,7 @@ SemaphoreHandle_t lcd_write_mutex;
 
 // typedef enum { switch__off, switch__on } switch_e;
 typedef char songname_t[32 + 1];
-typedef char songdata_t[1024];
+typedef char songdata_t[512];
 
 static void read_file(const char *filename) {
   printf("Request received to play/read: '%s'\n", filename);
@@ -179,11 +179,8 @@ static void adc_setup(void) {
 }
 
 void decoder_test(void) {
-  MP3_decoder__init();
   MP3_decoder__set_volume(0x77, 0x77);
   printf("Testing Decoder...\n");
-  // uint8_t n = 0;
-  // while (1) {
   printf("0x%04X\n", sci_read(0xB));
   MP3_decoder__sine_test(126, 3000);
   MP3_decoder__set_volume(0, 0);
@@ -195,10 +192,12 @@ static void test_pop_file(void) {
   MP3_song__print();
 }
 void MP3_task__set_up(void) {
+  delay__ms(5000);
   adc_setup();
   MP3_menu__init();
   MP3_keypad__init();
   MP3_song__print();
+  MP3_decoder__init();
   decoder_test();
   puts("");
 

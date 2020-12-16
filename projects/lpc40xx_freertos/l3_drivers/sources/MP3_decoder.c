@@ -134,11 +134,7 @@ void MP3_decoder__sine_test(uint8_t n, uint16_t delay_in_ms) {
   ssp2__exchange_byte(n);
   for (uint8_t iteration = 0; iteration < 4; iteration++)
     ssp2__exchange_byte(0x0);
-  /*ssp2__exchange_byte(0x00);
-  ssp2__exchange_byte(0x00);
-  ssp2__exchange_byte(0x00);
-  ssp2__exchange_byte(0x00);*/
-  // delay__ms(1000);
+
   MP3_decoder__disable_XDCS();
 
   delay__ms(delay_in_ms);
@@ -152,11 +148,7 @@ void MP3_decoder__sine_test(uint8_t n, uint16_t delay_in_ms) {
 
   for (uint8_t iteration = 0; iteration < 4; iteration++)
     ssp2__exchange_byte(0x0);
-  /*ssp2__exchange_byte(0x00);
-  ssp2__exchange_byte(0x00);
-  ssp2__exchange_byte(0x00);
-  ssp2__exchange_byte(0x00);*/
-  // delay__ms(1000);
+
   MP3_decoder__disable_XDCS();
 }
 
