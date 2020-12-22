@@ -6,7 +6,9 @@
 //                G E N E R A L
 //=================================================
 
-typedef enum { reboot = 0, login, main_menu, setting, song_list, song_info, filter } UI_Page;
+typedef enum { reboot = 0, login, main_menu, setting, song_list, song_info, filter, crash } UI_Page;
+
+typedef enum { MP3_rewind = 0, MP3_normal, MP3_fast_forward } MP3_speed;
 
 void MP3_menu__init(void);
 void MP3_menu__UI_handler(const unsigned char);

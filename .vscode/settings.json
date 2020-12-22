@@ -11,6 +11,8 @@
         "new": "cpp",
         "type_traits": "cpp",
         "random": "c",
-        "xiosbase": "c"
+        "xiosbase": "c",
+        "filesystem": "c",
+        "xstring": "c"
     }
 }

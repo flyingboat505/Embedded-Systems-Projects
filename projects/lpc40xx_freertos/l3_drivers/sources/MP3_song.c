@@ -3,7 +3,8 @@
 #include <stdbool.h>
 #include <string.h>
 
-typedef SONGS MP3_song_list[20];
+#define song_list_size 50
+typedef SONGS MP3_song_list[song_list_size];
 
 static MP3_song_list song_list;
 static size_t song_size;
@@ -42,10 +43,11 @@ static SONGS MP3_song__set_song(const char *song_buffer) {
  *================================================
  */
 
-static string16_t genre_option[21] = {0};
+static string16_t genre_option[song_list_size + 1] = {0};
 static uint8_t num_of_genre = 0;
 
 //============Overall Songlist===================
+extern volatile bool SD_DISCONNECTION;
 void MP3_song__init(void) {
   FIL file, file_out;
   song_size = 0;
@@ -67,6 +69,7 @@ void MP3_song__init(void) {
     }
   } else {
     puts("Failed to read populated file");
+    SD_DISCONNECTION = true;
   }
   puts("\n");
 }
